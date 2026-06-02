@@ -21,68 +21,19 @@
 
       <section class="chef-note" aria-label="今日菜单说明">
         <p>今晚主厨认真营业。你点菜，我下厨。</p>
-        <strong>今日热菜</strong>
+        <strong data-page-title>第 1 页 · 招牌热菜</strong>
       </section>
 
-      <section class="dish-list" aria-label="菜品列表">
-        <article class="dish-card is-featured" data-dish-id="ribs">
-          <img src="assets/sweet-sour-ribs.png" alt="糖醋排骨" />
-          <div class="dish-overlay">
-            <div class="dish-title-row">
-              <div>
-                <p>酸甜 / 油亮 / 下饭</p>
-                <h2>糖醋排骨</h2>
-              </div>
-              <div class="price-badge" aria-label="55 小熊币">
-                <strong>55</strong>
-                <span class="bear-coin" aria-hidden="true"></span>
-              </div>
-            </div>
-            <p class="dish-desc">一口甜，一口酸，认真收汁到亮晶晶。</p>
-            <div class="dish-actions">
-              <button class="detail-button" type="button" data-open-detail="ribs">看看详情</button>
-              <div class="stepper" aria-label="糖醋排骨数量">
-                <button type="button" data-action="decrease" data-dish-id="ribs" aria-label="减少糖醋排骨">-</button>
-                <span data-count-for="ribs">0</span>
-                <button type="button" data-action="increase" data-dish-id="ribs" aria-label="增加糖醋排骨">+</button>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <article class="dish-card is-offset" data-dish-id="wings">
-          <img src="assets/cola-chicken-wings.png" alt="可乐鸡翅" />
-          <div class="dish-overlay">
-            <div class="dish-title-row">
-              <div>
-                <p>焦香 / 微甜 / 温柔</p>
-                <h2>可乐鸡翅</h2>
-              </div>
-              <div class="price-badge" aria-label="45 小熊币">
-                <strong>45</strong>
-                <span class="bear-coin" aria-hidden="true"></span>
-              </div>
-            </div>
-            <p class="dish-desc">可乐慢慢煮进鸡翅里，适合当压轴。</p>
-            <div class="dish-actions">
-              <button class="detail-button" type="button" data-open-detail="wings">看看详情</button>
-              <div class="stepper" aria-label="可乐鸡翅数量">
-                <button type="button" data-action="decrease" data-dish-id="wings" aria-label="减少可乐鸡翅">-</button>
-                <span data-count-for="wings">0</span>
-                <button type="button" data-action="increase" data-dish-id="wings" aria-label="增加可乐鸡翅">+</button>
-              </div>
-            </div>
-          </div>
-        </article>
-      </section>
-
-      <section class="surprise-panel" aria-label="隐藏菜单">
+      <nav class="page-controls" aria-label="菜单翻页">
+        <button type="button" data-action="prev-page" aria-label="上一页">‹</button>
         <div>
-          <p>隐藏福利</p>
-          <strong>点满 2 份，主厨附赠饭后拥抱。</strong>
+          <span data-page-kicker>PAGE 1 / 3</span>
+          <strong data-page-name>招牌热菜</strong>
         </div>
-        <button type="button" data-action="quick-pair">直接双拼</button>
-      </section>
+        <button type="button" data-action="next-page" aria-label="下一页">›</button>
+      </nav>
+
+      <section class="dish-list" data-dish-list aria-label="菜品列表"></section>
     </main>
 
     <aside class="order-bar" aria-label="已选菜单">
