@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>熊熊菜单</title>
+    <link rel="stylesheet" href="styles/app.css" />
+  </head>
+  <body>
+    <main class="app-shell" aria-label="熊熊菜单点菜网页">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">DINNER AT HOME</p>
+          <h1>熊熊菜单</h1>
+        </div>
+        <button class="coin-pill" type="button" aria-label="小熊币说明">
+          <span class="coin-mini" aria-hidden="true"></span>
+          小熊币
+        </button>
+      </header>
+
+      <section class="chef-note" aria-label="今日菜单说明">
+        <p>今晚主厨认真营业。你点菜，我下厨。</p>
+        <strong>今日热菜</strong>
+      </section>
+
+      <section class="dish-list" aria-label="菜品列表">
+        <article class="dish-card is-featured" data-dish-id="ribs">
+          <img src="assets/sweet-sour-ribs.png" alt="糖醋排骨" />
+          <div class="dish-overlay">
+            <div class="dish-title-row">
+              <div>
+                <p>酸甜 / 油亮 / 下饭</p>
+                <h2>糖醋排骨</h2>
+              </div>
+              <div class="price-badge" aria-label="55 小熊币">
+                <strong>55</strong>
+                <span class="bear-coin" aria-hidden="true"></span>
+              </div>
+            </div>
+            <p class="dish-desc">一口甜，一口酸，认真收汁到亮晶晶。</p>
+            <div class="dish-actions">
+              <button class="detail-button" type="button" data-open-detail="ribs">看看详情</button>
+              <div class="stepper" aria-label="糖醋排骨数量">
+                <button type="button" data-action="decrease" data-dish-id="ribs" aria-label="减少糖醋排骨">-</button>
+                <span data-count-for="ribs">0</span>
+                <button type="button" data-action="increase" data-dish-id="ribs" aria-label="增加糖醋排骨">+</button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="dish-card is-offset" data-dish-id="wings">
+          <img src="assets/cola-chicken-wings.png" alt="可乐鸡翅" />
+          <div class="dish-overlay">
+            <div class="dish-title-row">
+              <div>
+                <p>焦香 / 微甜 / 温柔</p>
+                <h2>可乐鸡翅</h2>
+              </div>
+              <div class="price-badge" aria-label="45 小熊币">
+                <strong>45</strong>
+                <span class="bear-coin" aria-hidden="true"></span>
+              </div>
+            </div>
+            <p class="dish-desc">可乐慢慢煮进鸡翅里，适合当压轴。</p>
+            <div class="dish-actions">
+              <button class="detail-button" type="button" data-open-detail="wings">看看详情</button>
+              <div class="stepper" aria-label="可乐鸡翅数量">
+                <button type="button" data-action="decrease" data-dish-id="wings" aria-label="减少可乐鸡翅">-</button>
+                <span data-count-for="wings">0</span>
+                <button type="button" data-action="increase" data-dish-id="wings" aria-label="增加可乐鸡翅">+</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="surprise-panel" aria-label="隐藏菜单">
+        <div>
+          <p>隐藏福利</p>
+          <strong>点满 2 份，主厨附赠饭后拥抱。</strong>
+        </div>
+        <button type="button" data-action="quick-pair">直接双拼</button>
+      </section>
+    </main>
+
+    <aside class="order-bar" aria-label="已选菜单">
+      <div>
+        <span>今晚想吃</span>
+        <strong data-order-summary>还没点菜</strong>
+      </div>
+      <div class="total-price" aria-label="小熊币总价">
+        <strong data-total>0</strong>
+        <span class="bear-coin" aria-hidden="true"></span>
+      </div>
+      <button class="order-button" type="button" data-action="order">开饭</button>
+    </aside>
+
+    <dialog class="dish-dialog" data-dialog>
+      <button class="close-button" type="button" data-close-dialog aria-label="关闭">×</button>
+      <img data-dialog-image alt="" />
+      <div class="dialog-body">
+        <p data-dialog-kicker></p>
+        <h3 data-dialog-title></h3>
+        <p data-dialog-desc></p>
+      </div>
+    </dialog>
+
+    <div class="toast" data-toast role="status" aria-live="polite"></div>
+
+    <script src="scripts/app.js"></script>
+  </body>
+</html>
