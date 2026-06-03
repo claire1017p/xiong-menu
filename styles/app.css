@@ -51,7 +51,7 @@ button {
   max-width: 100vw;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 18px 16px 132px;
+  padding: 18px 16px calc(280px + env(safe-area-inset-bottom));
 }
 
 .topbar {
@@ -562,6 +562,7 @@ button {
 
   .app-shell {
     min-height: auto;
+    padding-bottom: 160px;
     border: 1px solid rgba(36, 23, 20, 0.12);
     border-radius: 8px;
     background: rgba(247, 240, 232, 0.72);
