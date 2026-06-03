@@ -56,7 +56,7 @@ button {
 
 .topbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
@@ -94,7 +94,7 @@ button {
 }
 
 .coin-pill {
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0;
@@ -452,7 +452,9 @@ button {
   width: 100%;
 }
 
-.dish-dialog {
+.dish-dialog,
+.order-dialog,
+.coin-dialog {
   width: min(calc(100vw - 32px), 440px);
   max-height: min(78vh, 720px);
   overflow: hidden;
@@ -464,7 +466,9 @@ button {
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
 }
 
-.dish-dialog::backdrop {
+.dish-dialog::backdrop,
+.order-dialog::backdrop,
+.coin-dialog::backdrop {
   background: rgba(20, 14, 12, 0.54);
   backdrop-filter: blur(6px);
 }
@@ -514,6 +518,295 @@ button {
   font-size: 15px;
   font-weight: 700;
   line-height: 1.65;
+}
+
+.order-dialog-body {
+  display: grid;
+  gap: 14px;
+  padding: 22px 18px 18px;
+}
+
+.order-dialog-body p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.order-dialog-body .order-send-status {
+  padding: 10px 12px;
+  border: 1px solid rgba(36, 23, 20, 0.1);
+  border-radius: 8px;
+  background: rgba(57, 113, 94, 0.1);
+  color: var(--moss);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.order-dialog-body h3 {
+  margin: 0;
+  color: var(--rouge);
+  font-family:
+    "Noto Serif CJK SC",
+    "SimSun",
+    serif;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.order-dialog-body pre {
+  overflow: auto;
+  max-height: 260px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid rgba(36, 23, 20, 0.12);
+  border-radius: 8px;
+  background: rgba(247, 240, 232, 0.82);
+  color: var(--ink);
+  font-family:
+    "Microsoft YaHei",
+    "PingFang SC",
+    sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.order-dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.order-dialog-actions button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--moss);
+  color: #fff9ef;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.order-dialog-actions button:first-child {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+.coin-dialog {
+  width: min(calc(100vw - 24px), 520px);
+  max-height: min(88vh, 760px);
+  overflow: auto;
+}
+
+.coin-dialog-body {
+  display: grid;
+  gap: 16px;
+  padding: 22px 18px 18px;
+}
+
+.coin-dialog-heading {
+  display: grid;
+  gap: 4px;
+  padding-right: 42px;
+}
+
+.coin-dialog-heading p,
+.coin-section-title p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.coin-dialog-heading h3 {
+  margin: 0;
+  color: var(--rouge);
+  font-family:
+    "Noto Serif CJK SC",
+    "SimSun",
+    serif;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.coin-account-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.coin-account-card {
+  display: grid;
+  gap: 3px;
+  min-height: 98px;
+  padding: 12px;
+  border: 1px solid rgba(36, 23, 20, 0.12);
+  border-radius: 8px;
+  background: rgba(247, 240, 232, 0.82);
+}
+
+.coin-account-card span,
+.coin-account-card small,
+.coin-ledger-item span,
+.coin-ledger-item small,
+.coin-ledger-item time {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.coin-account-card strong {
+  color: var(--moss);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.coin-operation-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.coin-mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid rgba(36, 23, 20, 0.12);
+  border-radius: 999px;
+  background: rgba(247, 240, 232, 0.82);
+}
+
+.coin-mode-tabs button {
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--moss);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.coin-mode-tabs button.is-active {
+  background: var(--moss);
+  color: #fff9ef;
+}
+
+.coin-form {
+  display: grid;
+  gap: 12px;
+}
+
+.coin-transfer-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.coin-form label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.coin-form label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.coin-form input,
+.coin-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(36, 23, 20, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 248, 237, 0.92);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.coin-submit-button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.coin-submit-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.coin-ledger-section {
+  display: grid;
+  gap: 10px;
+}
+
+.coin-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.coin-section-title strong {
+  color: var(--moss);
+  font-size: 15px;
+}
+
+.coin-ledger-list {
+  display: grid;
+  gap: 8px;
+}
+
+.coin-ledger-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(36, 23, 20, 0.1);
+  border-radius: 8px;
+  background: rgba(57, 113, 94, 0.08);
+}
+
+.coin-ledger-item > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.coin-ledger-item > div:last-child {
+  justify-items: end;
+}
+
+.coin-ledger-item strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.coin-ledger-item > div:last-child strong {
+  color: var(--rouge);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.coin-empty {
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed rgba(36, 23, 20, 0.18);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .toast {
@@ -579,8 +872,8 @@ button {
     font-size: 13px;
   }
 
-  .topbar {
-    grid-template-columns: minmax(0, 1fr) auto;
+  .coin-transfer-row {
+    grid-template-columns: 1fr 1fr;
   }
 
   .order-bar {

@@ -49,6 +49,44 @@ const dishes = {
   }
 };
 
+const ORDER_FORM_NAME = "xiong-menu-order";
+const COIN_API_URL = "/.netlify/functions/xiong-coins";
+const ACCOUNT_IDS = ["nono", "onetwo", "bank"];
+const TRANSFER_ACCOUNTS = ["nono", "onetwo"];
+const ACCOUNT_NAMES = {
+  nono: "Nono",
+  onetwo: "Onetwo",
+  bank: "Bank"
+};
+
+const COIN_MODE_CONFIG = {
+  add: {
+    fromLabel: "添加到",
+    submitLabel: "添加小熊币",
+    showTo: false,
+    fromAccounts: ACCOUNT_IDS
+  },
+  fine: {
+    fromLabel: "罚款账户",
+    submitLabel: "确认罚款",
+    showTo: false,
+    fromAccounts: TRANSFER_ACCOUNTS
+  },
+  pay: {
+    fromLabel: "付款账户",
+    submitLabel: "确认支付",
+    showTo: true,
+    fromAccounts: ACCOUNT_IDS,
+    toAccounts: ACCOUNT_IDS
+  },
+  save: {
+    fromLabel: "储蓄账户",
+    submitLabel: "存入 Bank",
+    showTo: false,
+    fromAccounts: TRANSFER_ACCOUNTS
+  }
+};
+
 const pages = [
   {
     title: "第 1 页 · 招牌热菜",
@@ -81,9 +119,26 @@ const dialogImageEl = document.querySelector("[data-dialog-image]");
 const dialogKickerEl = document.querySelector("[data-dialog-kicker]");
 const dialogTitleEl = document.querySelector("[data-dialog-title]");
 const dialogDescEl = document.querySelector("[data-dialog-desc]");
+const orderDialogEl = document.querySelector("[data-order-dialog]");
+const orderMessageEl = document.querySelector("[data-order-message]");
+const orderSendStatusEl = document.querySelector("[data-order-send-status]");
+const coinDialogEl = document.querySelector("[data-coin-dialog]");
+const coinAccountsEl = document.querySelector("[data-coin-accounts]");
+const coinLedgerEl = document.querySelector("[data-coin-ledger]");
+const coinFormEl = document.querySelector("[data-coin-form]");
+const coinFromLabelEl = document.querySelector("[data-coin-from-label]");
+const coinFromEl = document.querySelector("[data-coin-from]");
+const coinToFieldEl = document.querySelector("[data-coin-to-field]");
+const coinToEl = document.querySelector("[data-coin-to]");
+const coinAmountEl = document.querySelector("[data-coin-amount]");
+const coinNoteEl = document.querySelector("[data-coin-note]");
+const coinSubmitEl = document.querySelector("[data-coin-submit]");
 
 let currentPage = 0;
 let toastTimer;
+let coinMode = "add";
+let coinLedger = null;
+let isPlacingOrder = false;
 
 function renderPage() {
   const page = pages[currentPage];
@@ -130,12 +185,10 @@ function renderPage() {
 
 function renderOrder() {
   let total = 0;
-  const chosen = Object.entries(order)
-    .filter(([, count]) => count > 0)
-    .map(([id, count]) => {
-      total += dishes[id].price * count;
-      return `${dishes[id].name} x${count}`;
-    });
+  const chosen = getOrderItems().map(({ dish, count }) => {
+    total += dish.price * count;
+    return `${dish.name} x${count}`;
+  });
 
   document.querySelectorAll("[data-count-for]").forEach((el) => {
     el.textContent = order[el.dataset.countFor];
@@ -145,6 +198,20 @@ function renderOrder() {
   totalEl.textContent = total;
 }
 
+function getOrderItems() {
+  return Object.entries(order)
+    .filter(([, count]) => count > 0)
+    .map(([id, count]) => ({
+      id,
+      dish: dishes[id],
+      count
+    }));
+}
+
+function getOrderTotal(items = getOrderItems()) {
+  return items.reduce((sum, { dish, count }) => sum + dish.price * count, 0);
+}
+
 function showToast(message) {
   window.clearTimeout(toastTimer);
   toastEl.textContent = message;
@@ -152,6 +219,224 @@ function showToast(message) {
   toastTimer = window.setTimeout(() => {
     toastEl.classList.remove("is-visible");
   }, 2200);
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    };
+
+    return entities[char];
+  });
+}
+
+function getAccountName(accountId) {
+  return ACCOUNT_NAMES[accountId] || accountId || "外部";
+}
+
+function formatCoinTime(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Date(value).toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+}
+
+function formatBalances(ledger = coinLedger) {
+  if (!ledger) {
+    return "";
+  }
+
+  return ACCOUNT_IDS.map((id) => `${getAccountName(id)} ${ledger.accounts[id]?.balance ?? 0}`).join(" / ");
+}
+
+function renderSelectOptions(selectEl, accountIds, selectedId) {
+  selectEl.innerHTML = accountIds
+    .map((id) => `<option value="${id}" ${id === selectedId ? "selected" : ""}>${getAccountName(id)}</option>`)
+    .join("");
+}
+
+function renderCoinAccounts() {
+  if (!coinLedger) {
+    coinAccountsEl.innerHTML = `
+      <article class="coin-account-card is-loading">
+        <span>正在读取线上账本</span>
+        <strong>...</strong>
+      </article>
+    `;
+    return;
+  }
+
+  coinAccountsEl.innerHTML = ACCOUNT_IDS.map((id) => {
+    const account = coinLedger.accounts[id];
+
+    return `
+      <article class="coin-account-card">
+        <span>${getAccountName(id)}</span>
+        <strong>${account?.balance ?? 0}</strong>
+        <small>小熊币</small>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderCoinLedger() {
+  renderCoinAccounts();
+
+  if (!coinLedger) {
+    coinLedgerEl.innerHTML = `<p class="coin-empty">打开后会显示最近流水。</p>`;
+    return;
+  }
+
+  if (!coinLedger.transactions.length) {
+    coinLedgerEl.innerHTML = `<p class="coin-empty">还没有流水，先记一笔小熊币吧。</p>`;
+    return;
+  }
+
+  coinLedgerEl.innerHTML = coinLedger.transactions
+    .slice(0, 10)
+    .map((transaction) => {
+      const from = transaction.from ? getAccountName(transaction.from) : "外部";
+      const to = transaction.to ? getAccountName(transaction.to) : "外部";
+      const route = transaction.from || transaction.to ? `${from} → ${to}` : transaction.label;
+      const note = transaction.note ? `<small>${escapeHtml(transaction.note)}</small>` : "";
+
+      return `
+        <article class="coin-ledger-item">
+          <div>
+            <strong>${escapeHtml(transaction.label)}</strong>
+            <span>${escapeHtml(route)}</span>
+            ${note}
+          </div>
+          <div>
+            <strong>${transaction.amount}</strong>
+            <time>${formatCoinTime(transaction.createdAt)}</time>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function setCoinMode(mode) {
+  coinMode = COIN_MODE_CONFIG[mode] ? mode : "add";
+  const config = COIN_MODE_CONFIG[coinMode];
+
+  document.querySelectorAll("[data-coin-mode]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.coinMode === coinMode);
+  });
+
+  coinFromLabelEl.textContent = config.fromLabel;
+  coinSubmitEl.textContent = config.submitLabel;
+  coinToFieldEl.hidden = !config.showTo;
+
+  renderSelectOptions(coinFromEl, config.fromAccounts, coinMode === "pay" ? "onetwo" : config.fromAccounts[0]);
+
+  if (config.showTo) {
+    renderSelectOptions(coinToEl, config.toAccounts, coinMode === "pay" ? "nono" : config.toAccounts[0]);
+  }
+}
+
+async function fetchCoinLedger() {
+  renderCoinAccounts();
+  coinLedgerEl.innerHTML = `<p class="coin-empty">正在读取线上账本...</p>`;
+
+  const response = await fetch(COIN_API_URL, {
+    headers: {
+      Accept: "application/json"
+    }
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "读取小熊币账本失败");
+  }
+
+  coinLedger = data.ledger;
+  renderCoinLedger();
+  return data;
+}
+
+async function postCoinOperation(payload) {
+  const response = await fetch(COIN_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "小熊币操作失败");
+  }
+
+  coinLedger = data.ledger;
+  renderCoinLedger();
+  return data;
+}
+
+async function openWallet() {
+  coinDialogEl.showModal();
+  setCoinMode(coinMode);
+
+  try {
+    await fetchCoinLedger();
+  } catch (error) {
+    coinLedgerEl.innerHTML = `<p class="coin-empty">读取失败，请稍后再试。</p>`;
+    showToast(error.message);
+  }
+}
+
+async function handleCoinFormSubmit(event) {
+  event.preventDefault();
+
+  const amount = Math.trunc(Number(coinAmountEl.value));
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    showToast("先填一个大于 0 的小熊币数量。");
+    return;
+  }
+
+  const payload = {
+    action: coinMode,
+    amount,
+    note: coinNoteEl.value.trim()
+  };
+
+  if (coinMode === "add" || coinMode === "fine" || coinMode === "save") {
+    payload.account = coinFromEl.value;
+  }
+
+  if (coinMode === "pay") {
+    payload.from = coinFromEl.value;
+    payload.to = coinToEl.value;
+  }
+
+  coinSubmitEl.disabled = true;
+
+  try {
+    const data = await postCoinOperation(payload);
+    coinAmountEl.value = "";
+    coinNoteEl.value = "";
+    showToast(`${data.transaction.label}已记账。`);
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    coinSubmitEl.disabled = false;
+  }
 }
 
 function changeDishCount(id, delta) {
@@ -179,15 +464,157 @@ function openDetail(id) {
   dialogEl.showModal();
 }
 
-function placeOrder() {
-  const totalCount = Object.values(order).reduce((sum, count) => sum + count, 0);
+function buildMenuPaymentPayload(total, items) {
+  const itemSummary = items.map(({ dish, count }) => `${dish.name} x${count}`).join("，");
+
+  return {
+    action: "menu-order",
+    amount: total,
+    from: "onetwo",
+    to: "nono",
+    note: `熊熊菜单：${itemSummary}`
+  };
+}
+
+function buildOrderMessage(paymentResult = null) {
+  const items = getOrderItems();
+  const lines = items.map(({ dish, count }) => `- ${dish.name} x${count} = ${dish.price * count} 小熊币`);
+  const total = getOrderTotal(items);
+  const paymentLines = paymentResult?.transaction
+    ? [
+        "",
+        "小熊币付款",
+        `- Onetwo → Nono：${paymentResult.transaction.amount} 小熊币`,
+        `- 交易号：${paymentResult.transaction.id}`,
+        `- 余额：${formatBalances(paymentResult.ledger)}`
+      ]
+    : [];
+
+  return [
+    "熊熊菜单下单啦",
+    "",
+    ...lines,
+    "",
+    `合计：${total} 小熊币`,
+    ...paymentLines,
+    "",
+    "主厨请开火。"
+  ].join("\n");
+}
+
+function buildOrderPayload(message = buildOrderMessage(), paymentResult = null) {
+  const items = getOrderItems();
+  const itemSummary = items.map(({ dish, count }) => `${dish.name} x${count}`).join("，");
+  const orderedAt = new Date().toLocaleString("zh-CN", { hour12: false });
+  const transaction = paymentResult?.transaction;
+
+  return {
+    "form-name": ORDER_FORM_NAME,
+    ordered_at: orderedAt,
+    items: itemSummary,
+    total: String(getOrderTotal(items)),
+    payer: "Onetwo",
+    payee: "Nono",
+    payment: transaction ? `Onetwo -> Nono ${transaction.amount} 小熊币` : "",
+    transaction_id: transaction?.id || "",
+    balances: formatBalances(paymentResult?.ledger),
+    order: message
+  };
+}
+
+async function submitOrder(payload) {
+  const response = await fetch("/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams(payload).toString()
+  });
+
+  if (!response.ok) {
+    throw new Error(`Order submit failed: ${response.status}`);
+  }
+}
+
+async function placeOrder() {
+  if (isPlacingOrder) {
+    return;
+  }
+
+  const items = getOrderItems();
+  const totalCount = items.reduce((sum, { count }) => sum + count, 0);
 
   if (!totalCount) {
     showToast("先点一道菜，主厨才好开火。");
     return;
   }
 
-  showToast("收到，今晚菜单已安排，主厨马上开工。");
+  isPlacingOrder = true;
+  const total = getOrderTotal(items);
+  let message = buildOrderMessage();
+
+  orderMessageEl.textContent = message;
+  orderSendStatusEl.textContent = "正在把小熊币从 Onetwo 转给 Nono...";
+  orderDialogEl.showModal();
+  showToast("订单小票已生成，正在处理小熊币。");
+
+  let paymentResult;
+
+  try {
+    paymentResult = await postCoinOperation(buildMenuPaymentPayload(total, items));
+  } catch (error) {
+    orderSendStatusEl.textContent = `小熊币转账失败，订单没有自动发送：${error.message}`;
+    showToast("小熊币转账失败，订单还没发出。");
+    isPlacingOrder = false;
+    return;
+  }
+
+  message = buildOrderMessage(paymentResult);
+  orderMessageEl.textContent = message;
+  orderSendStatusEl.textContent = "小熊币已到账 Nono，正在发送订单通知...";
+
+  try {
+    await submitOrder(buildOrderPayload(message, paymentResult));
+    orderSendStatusEl.textContent = `订单通知已自动发出，${total} 小熊币已从 Onetwo 转入 Nono。`;
+    showToast("下单成功，小熊币已到账。");
+  } catch {
+    orderSendStatusEl.textContent = "小熊币已到账，但订单通知自动发送失败，请用下面按钮发给主厨。";
+    showToast("订单通知失败，但小熊币已到账。");
+  } finally {
+    isPlacingOrder = false;
+  }
+}
+
+async function copyOrderMessage() {
+  const message = orderMessageEl.textContent || buildOrderMessage();
+
+  try {
+    await navigator.clipboard.writeText(message);
+    showToast("订单已复制，粘贴到微信发给主厨。");
+  } catch {
+    showToast("复制失败，请长按小票文字手动复制。");
+  }
+}
+
+async function shareOrderMessage() {
+  const message = orderMessageEl.textContent || buildOrderMessage();
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "熊熊菜单",
+        text: message
+      });
+      showToast("订单已打开分享面板。");
+      return;
+    } catch (error) {
+      if (error.name === "AbortError") {
+        return;
+      }
+    }
+  }
+
+  await copyOrderMessage();
 }
 
 document.addEventListener("click", (event) => {
@@ -224,6 +651,18 @@ document.addEventListener("click", (event) => {
   if (action === "order") {
     placeOrder();
   }
+
+  if (action === "open-wallet") {
+    openWallet();
+  }
+
+  if (action === "copy-order") {
+    copyOrderMessage();
+  }
+
+  if (action === "share-order") {
+    shareOrderMessage();
+  }
 });
 
 document.querySelector("[data-close-dialog]").addEventListener("click", () => {
@@ -236,4 +675,33 @@ dialogEl.addEventListener("click", (event) => {
   }
 });
 
+document.querySelector("[data-close-order-dialog]").addEventListener("click", () => {
+  orderDialogEl.close();
+});
+
+orderDialogEl.addEventListener("click", (event) => {
+  if (event.target === orderDialogEl) {
+    orderDialogEl.close();
+  }
+});
+
+document.querySelector("[data-close-coin-dialog]").addEventListener("click", () => {
+  coinDialogEl.close();
+});
+
+coinDialogEl.addEventListener("click", (event) => {
+  if (event.target === coinDialogEl) {
+    coinDialogEl.close();
+  }
+});
+
+document.querySelectorAll("[data-coin-mode]").forEach((button) => {
+  button.addEventListener("click", () => {
+    setCoinMode(button.dataset.coinMode);
+  });
+});
+
+coinFormEl.addEventListener("submit", handleCoinFormSubmit);
+
 renderPage();
+setCoinMode(coinMode);

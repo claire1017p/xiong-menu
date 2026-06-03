@@ -13,7 +13,7 @@
           <p class="eyebrow">DINNER AT HOME</p>
           <h1>熊熊菜单</h1>
         </div>
-        <button class="coin-pill" type="button" aria-label="小熊币说明">
+        <button class="coin-pill" type="button" data-action="open-wallet" aria-label="打开小熊币管理">
           <span class="coin-mini" aria-hidden="true"></span>
           小熊币
         </button>
@@ -48,6 +48,19 @@
       <button class="order-button" type="button" data-action="order">开饭</button>
     </aside>
 
+    <form name="xiong-menu-order" method="POST" data-netlify="true" hidden>
+      <input type="hidden" name="form-name" value="xiong-menu-order" />
+      <input type="hidden" name="ordered_at" />
+      <input type="hidden" name="items" />
+      <input type="hidden" name="total" />
+      <input type="hidden" name="payer" />
+      <input type="hidden" name="payee" />
+      <input type="hidden" name="payment" />
+      <input type="hidden" name="transaction_id" />
+      <input type="hidden" name="balances" />
+      <textarea name="order"></textarea>
+    </form>
+
     <dialog class="dish-dialog" data-dialog>
       <button class="close-button" type="button" data-close-dialog aria-label="关闭">×</button>
       <img data-dialog-image alt="" />
@@ -55,6 +68,75 @@
         <p data-dialog-kicker></p>
         <h3 data-dialog-title></h3>
         <p data-dialog-desc></p>
+      </div>
+    </dialog>
+
+    <dialog class="order-dialog" data-order-dialog>
+      <button class="close-button" type="button" data-close-order-dialog aria-label="关闭">×</button>
+      <div class="order-dialog-body">
+        <p>ORDER FOR CHEF</p>
+        <h3>下单成功</h3>
+        <pre data-order-message></pre>
+        <p class="order-send-status" data-order-send-status></p>
+        <div class="order-dialog-actions">
+          <button type="button" data-action="share-order">发给主厨</button>
+          <button type="button" data-action="copy-order">复制订单</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="coin-dialog" data-coin-dialog>
+      <button class="close-button" type="button" data-close-coin-dialog aria-label="关闭">×</button>
+      <div class="coin-dialog-body">
+        <div class="coin-dialog-heading">
+          <p>XIONG COIN BANK</p>
+          <h3>小熊币管理</h3>
+        </div>
+
+        <section class="coin-account-grid" data-coin-accounts aria-label="小熊币账户"></section>
+
+        <section class="coin-operation-panel" aria-label="小熊币操作">
+          <div class="coin-mode-tabs" role="tablist" aria-label="操作类型">
+            <button class="is-active" type="button" data-coin-mode="add">添加</button>
+            <button type="button" data-coin-mode="fine">罚款</button>
+            <button type="button" data-coin-mode="pay">支付</button>
+            <button type="button" data-coin-mode="save">储蓄</button>
+          </div>
+
+          <form class="coin-form" data-coin-form>
+            <div class="coin-transfer-row">
+              <label>
+                <span data-coin-from-label>添加到</span>
+                <select data-coin-from></select>
+              </label>
+              <label data-coin-to-field>
+                <span>收款账户</span>
+                <select data-coin-to></select>
+              </label>
+            </div>
+
+            <div class="coin-transfer-row">
+              <label>
+                <span>数量</span>
+                <input data-coin-amount type="number" inputmode="numeric" min="1" step="1" placeholder="1" />
+              </label>
+              <label>
+                <span>备注</span>
+                <input data-coin-note type="text" maxlength="32" placeholder="晚饭、奖励、迟到..." />
+              </label>
+            </div>
+
+            <button class="coin-submit-button" type="submit" data-coin-submit>记一笔</button>
+          </form>
+        </section>
+
+        <section class="coin-ledger-section" aria-label="小熊币流水">
+          <div class="coin-section-title">
+            <p>LEDGER</p>
+            <strong>最近流水</strong>
+          </div>
+          <div class="coin-ledger-list" data-coin-ledger></div>
+        </section>
       </div>
     </dialog>
 
