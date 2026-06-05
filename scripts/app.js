@@ -163,6 +163,7 @@ const passwordSubmitEl = document.querySelector("[data-password-submit]");
 const loginMessageEl = document.querySelector("[data-login-message]");
 const authStatusEl = document.querySelector("[data-auth-status]");
 const authUserEl = document.querySelector("[data-auth-user]");
+const portalUserEl = document.querySelector("[data-portal-user]");
 const orderDialogEl = document.querySelector("[data-order-dialog]");
 const orderMessageEl = document.querySelector("[data-order-message]");
 const orderSendStatusEl = document.querySelector("[data-order-send-status]");
@@ -401,13 +402,20 @@ function saveAuthSession(account) {
   }));
 }
 
+function setAppView(view = "portal") {
+  document.body.classList.toggle("view-portal", view === "portal");
+  document.body.classList.toggle("view-menu", view === "menu");
+}
+
 function applyAuthenticatedState(account) {
   activeAccount = getPublicAccount(account.id);
   saveAuthSession(activeAccount);
   document.body.classList.remove("auth-required");
   document.body.classList.add("is-authenticated");
   authUserEl.textContent = activeAccount.name;
+  portalUserEl.textContent = activeAccount.name;
   authStatusEl.hidden = false;
+  setAppView("portal");
   setCoinMode(getDefaultCoinMode());
   showLoginForm("");
 }
@@ -417,7 +425,9 @@ function requireLogin(message = "") {
   sessionStorage.removeItem(AUTH_SESSION_KEY);
   document.body.classList.add("auth-required");
   document.body.classList.remove("is-authenticated");
+  document.body.classList.remove("view-portal", "view-menu");
   authStatusEl.hidden = true;
+  portalUserEl.textContent = "";
   showLoginForm(message);
   window.setTimeout(() => loginPasswordEl.focus(), 0);
 }
@@ -1689,6 +1699,24 @@ document.addEventListener("click", (event) => {
 
   if (!activeAccount) {
     requireLogin("请先登录账户。");
+    return;
+  }
+
+  if (action === "enter-menu") {
+    setAppView("menu");
+    showToast("进入点菜页面。");
+    return;
+  }
+
+  if (action === "back-portal") {
+    setAppView("portal");
+    showToast("回到熊付宝。");
+    return;
+  }
+
+  if (action === "enter-wallet") {
+    setAppView("portal");
+    openWallet();
     return;
   }
 

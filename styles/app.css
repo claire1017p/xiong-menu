@@ -42,8 +42,12 @@ body {
   color: var(--ink);
 }
 
+body.auth-required .portal-screen,
 body.auth-required .app-shell,
-body.auth-required .order-bar {
+body.auth-required .order-bar,
+body:not(.view-portal) .portal-screen,
+body:not(.view-menu) .app-shell,
+body:not(.view-menu) .order-bar {
   display: none;
 }
 
@@ -163,6 +167,118 @@ button:disabled {
 
 .login-message[data-tone="error"] {
   color: var(--rouge);
+}
+
+.portal-screen {
+  width: min(100%, 520px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.portal-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  padding: max(10px, env(safe-area-inset-top)) 0 22px;
+}
+
+.portal-header h1 {
+  margin: 4px 0 6px;
+  color: var(--rouge);
+  font-family:
+    "STXingkai",
+    "KaiTi",
+    "Noto Serif CJK SC",
+    serif;
+  font-size: clamp(48px, 14vw, 68px);
+  line-height: 0.98;
+  font-weight: 900;
+  text-shadow: 0 2px 0 rgba(228, 184, 101, 0.42);
+}
+
+.portal-header p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.portal-logout,
+.back-pill {
+  min-height: 40px;
+  border: 1px solid rgba(36, 23, 20, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 248, 237, 0.86);
+  color: var(--moss);
+  font-weight: 900;
+  box-shadow: 0 10px 20px rgba(30, 20, 16, 0.08);
+}
+
+.portal-logout {
+  display: grid;
+  gap: 0;
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.portal-logout span {
+  font-size: 13px;
+}
+
+.portal-logout small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.portal-entry-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.portal-entry {
+  display: grid;
+  gap: 8px;
+  min-height: 152px;
+  padding: 20px;
+  border: 1px solid rgba(36, 23, 20, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 248, 237, 0.86);
+  color: var(--ink);
+  text-align: left;
+  box-shadow: var(--shadow);
+}
+
+.portal-entry span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.portal-entry strong {
+  color: var(--moss);
+  font-family:
+    "Noto Serif CJK SC",
+    "SimSun",
+    serif;
+  font-size: 34px;
+  line-height: 1.05;
+}
+
+.portal-entry small {
+  max-width: 28em;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.portal-entry.is-coin {
+  background:
+    linear-gradient(135deg, rgba(228, 184, 101, 0.2), transparent 58%),
+    rgba(255, 248, 237, 0.9);
 }
 
 .app-shell {

@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>熊熊菜单</title>
+    <title>熊付宝</title>
     <link rel="stylesheet" href="styles/app.css" />
   </head>
   <body class="auth-required">
-    <section class="login-screen" data-login-screen aria-label="小熊币登录">
+    <section class="login-screen" data-login-screen aria-label="熊付宝登录">
       <div class="login-card">
-        <p class="eyebrow">XIONG MENU LOGIN</p>
-        <h2>登录熊熊菜单</h2>
+        <p class="eyebrow">XIONG PAY LOGIN</p>
+        <h2>登录熊付宝</h2>
 
         <form class="login-form" data-login-form>
           <label>
@@ -42,20 +42,48 @@
       </div>
     </section>
 
-    <main class="app-shell" aria-label="熊熊菜单点菜网页">
+    <section class="portal-screen" data-portal-screen aria-label="熊付宝入口">
+      <header class="portal-header">
+        <div>
+          <p class="eyebrow">XIONG PAY</p>
+          <h1>熊付宝</h1>
+          <p>选择今天要进入的页面</p>
+        </div>
+        <button class="portal-logout" type="button" data-action="logout">
+          <span data-portal-user></span>
+          <small>退出</small>
+        </button>
+      </header>
+
+      <div class="portal-entry-grid">
+        <button class="portal-entry is-menu" type="button" data-action="enter-menu">
+          <span>DINNER</span>
+          <strong>熊熊菜单</strong>
+          <small>打开熊熊菜单，下单后自动结算小熊币。</small>
+        </button>
+        <button class="portal-entry is-coin" type="button" data-action="enter-wallet">
+          <span>COINS</span>
+          <strong>小熊币管理</strong>
+          <small>查看余额、流水、储蓄和理财产品。</small>
+        </button>
+      </div>
+    </section>
+
+    <main class="app-shell" aria-label="熊熊菜单点菜页面">
       <header class="topbar">
         <div>
-          <p class="eyebrow">DINNER AT HOME</p>
+          <p class="eyebrow">XIONG MENU</p>
           <h1>熊熊菜单</h1>
         </div>
         <div class="topbar-actions">
+          <button class="back-pill" type="button" data-action="back-portal">主页</button>
           <button class="auth-pill" type="button" data-action="logout" data-auth-status hidden aria-label="退出登录">
             <span data-auth-user></span>
             <small>退出</small>
           </button>
           <button class="coin-pill" type="button" data-action="open-wallet" aria-label="打开小熊币管理">
             <span class="coin-mini" aria-hidden="true"></span>
-            小熊币
+            小熊币管理
           </button>
         </div>
       </header>
