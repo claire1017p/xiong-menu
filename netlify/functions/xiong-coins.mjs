@@ -3,8 +3,31 @@ import { getStore } from "@netlify/blobs";
 const STORE_NAME = "xiong-coin-ledger";
 const LEDGER_KEY = "ledger-v1";
 const MAX_TRANSACTIONS = 120;
+const MAX_HOLDINGS = 160;
 
 const ACCOUNT_ORDER = ["nono", "onetwo", "bank"];
+const SAVINGS_ACCOUNTS = ["nono", "onetwo"];
+const DEFAULT_SAVINGS_PRODUCT_ID = "fixed-30d-3";
+const SAVINGS_PRODUCTS = [
+  {
+    id: DEFAULT_SAVINGS_PRODUCT_ID,
+    name: "30天定期",
+    summary: "默认储蓄，月利率 3%",
+    monthlyRate: 0.03,
+    termMonths: 1,
+    termDays: 30,
+    fixedAmount: null
+  },
+  {
+    id: "fixed-6m-10-2000",
+    name: "小熊高息 6个月",
+    summary: "储值 2000 小熊币，月利率 10%",
+    monthlyRate: 0.1,
+    termMonths: 6,
+    termDays: null,
+    fixedAmount: 2000
+  }
+];
 const DEFAULT_LEDGER = {
   version: 1,
   accounts: {
@@ -12,6 +35,7 @@ const DEFAULT_LEDGER = {
     onetwo: { id: "onetwo", name: "Onetwo", balance: 0 },
     bank: { id: "bank", name: "Bank", balance: 0 }
   },
+  holdings: [],
   transactions: [],
   updatedAt: null
 };
@@ -21,6 +45,7 @@ const ACTION_LABELS = {
   fine: "罚款",
   pay: "支付",
   save: "储蓄",
+  "savings-redeem": "到期返还",
   "menu-order": "菜单付款"
 };
 
@@ -44,6 +69,40 @@ function normalizeBalance(value) {
   return Number.isFinite(balance) ? Math.max(0, balance) : 0;
 }
 
+function normalizeHolding(savedHolding) {
+  if (!savedHolding || typeof savedHolding !== "object") {
+    return null;
+  }
+
+  const accountId = savedHolding.accountId;
+  const productId = savedHolding.productId;
+  const principal = normalizeBalance(savedHolding.principal);
+  const interest = normalizeBalance(savedHolding.interest);
+  const payout = normalizeBalance(savedHolding.payout);
+
+  if (!SAVINGS_ACCOUNTS.includes(accountId) || !productId || principal <= 0) {
+    return null;
+  }
+
+  return {
+    id: typeof savedHolding.id === "string" ? savedHolding.id : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    accountId,
+    productId,
+    productName: typeof savedHolding.productName === "string" ? savedHolding.productName : "定期储蓄",
+    principal,
+    interest,
+    payout: payout || principal + interest,
+    monthlyRate: Number(savedHolding.monthlyRate) || 0,
+    termMonths: Math.max(1, Math.trunc(Number(savedHolding.termMonths) || 1)),
+    termDays: savedHolding.termDays === null ? null : Math.max(1, Math.trunc(Number(savedHolding.termDays) || 30)),
+    startAt: savedHolding.startAt || new Date().toISOString(),
+    maturityAt: savedHolding.maturityAt || new Date().toISOString(),
+    status: savedHolding.status === "redeemed" ? "redeemed" : "active",
+    redeemedAt: savedHolding.redeemedAt || null,
+    note: typeof savedHolding.note === "string" ? savedHolding.note : ""
+  };
+}
+
 export function normalizeLedger(savedLedger) {
   const ledger = cloneDefaultLedger();
 
@@ -57,10 +116,43 @@ export function normalizeLedger(savedLedger) {
       ledger.transactions = savedLedger.transactions.slice(0, MAX_TRANSACTIONS);
     }
 
+    if (Array.isArray(savedLedger.holdings)) {
+      ledger.holdings = savedLedger.holdings
+        .map(normalizeHolding)
+        .filter(Boolean)
+        .slice(0, MAX_HOLDINGS);
+    }
+
     ledger.updatedAt = savedLedger.updatedAt || null;
   }
 
   return ledger;
+}
+
+function getSavingsProduct(productId = DEFAULT_SAVINGS_PRODUCT_ID) {
+  const product = SAVINGS_PRODUCTS.find((item) => item.id === productId);
+
+  if (!product) {
+    throw new Error("理财产品不存在");
+  }
+
+  return product;
+}
+
+function addTerm(startAt, product) {
+  const maturity = new Date(startAt);
+
+  if (product.termDays) {
+    maturity.setDate(maturity.getDate() + product.termDays);
+  } else {
+    maturity.setMonth(maturity.getMonth() + product.termMonths);
+  }
+
+  return maturity;
+}
+
+function calculateInterest(principal, product) {
+  return Math.round(principal * product.monthlyRate * product.termMonths);
 }
 
 function getAccount(ledger, accountId, fieldName) {
@@ -89,7 +181,7 @@ function getNote(value) {
   return value.trim().slice(0, 80);
 }
 
-function makeTransaction({ action, amount, from = null, to = null, note = "" }) {
+function makeTransaction({ action, amount, from = null, to = null, note = "", extra = {} }) {
   const now = new Date();
 
   return {
@@ -100,7 +192,8 @@ function makeTransaction({ action, amount, from = null, to = null, note = "" }) 
     from,
     to,
     note,
-    createdAt: now.toISOString()
+    createdAt: now.toISOString(),
+    ...extra
   };
 }
 
@@ -128,6 +221,85 @@ function applyTransaction(ledger, transaction) {
   ledger.updatedAt = transaction.createdAt;
 
   return transaction;
+}
+
+function makeHolding({ account, amount, product, note = "" }) {
+  const start = new Date();
+  const maturity = addTerm(start, product);
+  const interest = calculateInterest(amount, product);
+
+  return {
+    id: `${start.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+    accountId: account.id,
+    productId: product.id,
+    productName: product.name,
+    principal: amount,
+    interest,
+    payout: amount + interest,
+    monthlyRate: product.monthlyRate,
+    termMonths: product.termMonths,
+    termDays: product.termDays,
+    startAt: start.toISOString(),
+    maturityAt: maturity.toISOString(),
+    status: "active",
+    redeemedAt: null,
+    note
+  };
+}
+
+function addHolding(ledger, holding) {
+  ledger.holdings.unshift(holding);
+  ledger.holdings = ledger.holdings.slice(0, MAX_HOLDINGS);
+  return holding;
+}
+
+function redeemHolding(ledger, holding, now = new Date()) {
+  if (holding.status !== "active" || new Date(holding.maturityAt) > now) {
+    return null;
+  }
+
+  const account = getAccount(ledger, holding.accountId, "返还账户");
+  const bank = getAccount(ledger, "bank", "收款账户");
+  assertCanDebit(bank, holding.principal);
+
+  bank.balance -= holding.principal;
+  account.balance += holding.payout;
+  holding.status = "redeemed";
+  holding.redeemedAt = now.toISOString();
+
+  const transaction = makeTransaction({
+    action: "savings-redeem",
+    amount: holding.payout,
+    from: "bank",
+    to: account.id,
+    note: `${holding.productName}到期返还：本金 ${holding.principal} + 利息 ${holding.interest}`,
+    extra: {
+      holdingId: holding.id,
+      productId: holding.productId,
+      principal: holding.principal,
+      interest: holding.interest,
+      maturedAt: holding.maturityAt
+    }
+  });
+
+  ledger.transactions.unshift(transaction);
+  ledger.transactions = ledger.transactions.slice(0, MAX_TRANSACTIONS);
+  ledger.updatedAt = transaction.createdAt;
+
+  return transaction;
+}
+
+export function settleMaturedHoldings(ledger, now = new Date()) {
+  const transactions = [];
+
+  for (const holding of ledger.holdings) {
+    const transaction = redeemHolding(ledger, holding, now);
+    if (transaction) {
+      transactions.push(transaction);
+    }
+  }
+
+  return transactions;
 }
 
 export function applyOperation(ledger, payload) {
@@ -169,16 +341,39 @@ export function applyOperation(ledger, payload) {
 
   if (action === "save") {
     const account = getAccount(ledger, payload.account, "储蓄账户");
-    return applyTransaction(
+
+    if (!SAVINGS_ACCOUNTS.includes(account.id)) {
+      throw new Error("Bank 不能购买理财产品");
+    }
+
+    const product = getSavingsProduct(payload.productId);
+
+    if (product.fixedAmount && amount !== product.fixedAmount) {
+      throw new Error(`${product.name} 固定储值 ${product.fixedAmount} 小熊币`);
+    }
+
+    const holding = makeHolding({ account, amount, product, note });
+    const transaction = applyTransaction(
       ledger,
       makeTransaction({
         action,
         amount,
         from: account.id,
         to: "bank",
-        note: note || "存入 Bank"
+        note: note || `购买${product.name}`,
+        extra: {
+          holdingId: holding.id,
+          productId: product.id,
+          productName: product.name,
+          interest: holding.interest,
+          payout: holding.payout,
+          maturityAt: holding.maturityAt
+        }
       })
     );
+
+    addHolding(ledger, holding);
+    return transaction;
   }
 
   if (action === "pay" || action === "menu-order") {
@@ -217,8 +412,20 @@ async function writeLedger(ledger) {
 
 export default async function handler(req) {
   if (req.method === "GET") {
-    const ledger = await readLedger();
-    return json({ ledger });
+    try {
+      const ledger = await readLedger();
+      const settlements = settleMaturedHoldings(ledger);
+
+      if (settlements.length) {
+        await writeLedger(ledger);
+      }
+
+      return json({ ledger, products: SAVINGS_PRODUCTS, settlements });
+    } catch (error) {
+      return json({
+        error: error instanceof Error ? error.message : "读取小熊币账本失败"
+      }, { status: 400 });
+    }
   }
 
   if (req.method !== "POST") {
@@ -228,13 +435,16 @@ export default async function handler(req) {
   try {
     const payload = await req.json();
     const ledger = await readLedger();
+    const settlements = settleMaturedHoldings(ledger);
     const transaction = applyOperation(ledger, payload);
 
     await writeLedger(ledger);
 
     return json({
       ledger,
-      transaction
+      transaction,
+      products: SAVINGS_PRODUCTS,
+      settlements
     });
   } catch (error) {
     return json({

@@ -62,6 +62,27 @@ const ACCOUNT_NAMES = {
   onetwo: "Onetwo",
   bank: "Bank"
 };
+const DEFAULT_SAVINGS_PRODUCT_ID = "fixed-30d-3";
+const SAVINGS_PRODUCTS = [
+  {
+    id: DEFAULT_SAVINGS_PRODUCT_ID,
+    name: "30天定期",
+    summary: "默认储蓄，月利率 3%",
+    monthlyRate: 0.03,
+    termMonths: 1,
+    termDays: 30,
+    fixedAmount: null
+  },
+  {
+    id: "fixed-6m-10-2000",
+    name: "小熊高息 6个月",
+    summary: "储值 2000 小熊币，月利率 10%",
+    monthlyRate: 0.1,
+    termMonths: 6,
+    termDays: null,
+    fixedAmount: 2000
+  }
+];
 
 const COIN_MODE_CONFIG = {
   add: {
@@ -85,7 +106,7 @@ const COIN_MODE_CONFIG = {
   },
   save: {
     fromLabel: "储蓄账户",
-    submitLabel: "存入 Bank",
+    submitLabel: "购买30天定期",
     showTo: false,
     fromAccounts: TRANSFER_ACCOUNTS
   },
@@ -161,11 +182,15 @@ const coinQueryAccountEl = document.querySelector("[data-coin-query-account]");
 const coinQuerySummaryEl = document.querySelector("[data-coin-query-summary]");
 const coinQueryLedgerEl = document.querySelector("[data-coin-query-ledger]");
 const coinRefreshEl = document.querySelector("[data-coin-refresh]");
+const savingsPanelEl = document.querySelector("[data-savings-panel]");
+const savingsProductsEl = document.querySelector("[data-savings-products]");
+const savingsHoldingsEl = document.querySelector("[data-savings-holdings]");
 
 let currentPage = 0;
 let toastTimer;
 let coinMode = "add";
 let coinLedger = null;
+let savingsProducts = SAVINGS_PRODUCTS;
 let activeAccount = null;
 let pendingPasswordAccount = null;
 let pendingPassword = "";
@@ -437,6 +462,7 @@ function createDefaultLocalLedger() {
       onetwo: { id: "onetwo", name: "Onetwo", balance: 0 },
       bank: { id: "bank", name: "Bank", balance: 0 }
     },
+    holdings: [],
     transactions: [],
     updatedAt: null
   };
@@ -455,6 +481,10 @@ function normalizeLocalLedger(savedLedger) {
       ledger.transactions = savedLedger.transactions.slice(0, 120);
     }
 
+    if (Array.isArray(savedLedger.holdings)) {
+      ledger.holdings = savedLedger.holdings.slice(0, 160);
+    }
+
     ledger.updatedAt = savedLedger.updatedAt || null;
   }
 
@@ -463,7 +493,11 @@ function normalizeLocalLedger(savedLedger) {
 
 function readLocalLedger() {
   try {
-    return normalizeLocalLedger(JSON.parse(localStorage.getItem(LOCAL_LEDGER_KEY) || "null"));
+    const ledger = normalizeLocalLedger(JSON.parse(localStorage.getItem(LOCAL_LEDGER_KEY) || "null"));
+    if (settleLocalMaturedHoldings(ledger)) {
+      writeLocalLedger(ledger);
+    }
+    return ledger;
   } catch {
     localStorage.removeItem(LOCAL_LEDGER_KEY);
     return createDefaultLocalLedger();
@@ -492,12 +526,63 @@ function getLocalCoinAccount(ledger, accountId, fieldName) {
   return ledger.accounts[accountId];
 }
 
-function makeLocalTransaction({ action, amount, from = null, to = null, note = "" }) {
+function getSavingsProduct(productId = DEFAULT_SAVINGS_PRODUCT_ID) {
+  const product = savingsProducts.find((item) => item.id === productId) || SAVINGS_PRODUCTS.find((item) => item.id === productId);
+
+  if (!product) {
+    throw new Error("理财产品不存在");
+  }
+
+  return product;
+}
+
+function addSavingsTerm(startAt, product) {
+  const maturity = new Date(startAt);
+
+  if (product.termDays) {
+    maturity.setDate(maturity.getDate() + product.termDays);
+  } else {
+    maturity.setMonth(maturity.getMonth() + product.termMonths);
+  }
+
+  return maturity;
+}
+
+function calculateSavingsInterest(principal, product) {
+  return Math.round(principal * product.monthlyRate * product.termMonths);
+}
+
+function makeLocalHolding({ account, amount, product, note = "" }) {
+  const start = new Date();
+  const maturity = addSavingsTerm(start, product);
+  const interest = calculateSavingsInterest(amount, product);
+
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    accountId: account.id,
+    productId: product.id,
+    productName: product.name,
+    principal: amount,
+    interest,
+    payout: amount + interest,
+    monthlyRate: product.monthlyRate,
+    termMonths: product.termMonths,
+    termDays: product.termDays,
+    startAt: start.toISOString(),
+    maturityAt: maturity.toISOString(),
+    status: "active",
+    redeemedAt: null,
+    note
+  };
+}
+
+function makeLocalTransaction({ action, amount, from = null, to = null, note = "", extra = {} }) {
   const labels = {
     add: "添加",
     fine: "罚款",
     pay: "支付",
     save: "储蓄",
+    "savings-redeem": "到期返还",
     "menu-order": "菜单付款"
   };
   const createdAt = new Date().toISOString();
@@ -510,7 +595,8 @@ function makeLocalTransaction({ action, amount, from = null, to = null, note = "
     from,
     to,
     note: String(note || "").trim().slice(0, 80),
-    createdAt
+    createdAt,
+    ...extra
   };
 }
 
@@ -518,6 +604,48 @@ function assertLocalCanDebit(account, amount) {
   if (account.balance < amount) {
     throw new Error(`${account.name} 余额不足，不能扣成负数。当前余额 ${account.balance}，需要 ${amount}。`);
   }
+}
+
+function settleLocalMaturedHoldings(ledger) {
+  const now = new Date();
+  let changed = false;
+
+  for (const holding of ledger.holdings) {
+    if (holding.status !== "active" || new Date(holding.maturityAt) > now) {
+      continue;
+    }
+
+    const account = getLocalCoinAccount(ledger, holding.accountId, "返还账户");
+    const bank = getLocalCoinAccount(ledger, "bank", "收款账户");
+
+    if (bank.balance < holding.principal) {
+      continue;
+    }
+
+    bank.balance -= holding.principal;
+    account.balance += holding.payout;
+    holding.status = "redeemed";
+    holding.redeemedAt = now.toISOString();
+    ledger.transactions.unshift(makeLocalTransaction({
+      action: "savings-redeem",
+      amount: holding.payout,
+      from: "bank",
+      to: account.id,
+      note: `${holding.productName}到期返还：本金 ${holding.principal} + 利息 ${holding.interest}`,
+      extra: {
+        holdingId: holding.id,
+        productId: holding.productId,
+        principal: holding.principal,
+        interest: holding.interest,
+        maturedAt: holding.maturityAt
+      }
+    }));
+    ledger.transactions = ledger.transactions.slice(0, 120);
+    ledger.updatedAt = holding.redeemedAt;
+    changed = true;
+  }
+
+  return changed;
 }
 
 function applyLocalCoinOperation(payload) {
@@ -550,13 +678,39 @@ function applyLocalCoinOperation(payload) {
     });
   } else if (action === "save") {
     const account = getLocalCoinAccount(ledger, payload.account, "储蓄账户");
+    const product = getSavingsProduct(payload.productId);
+
+    if (account.id === "bank") {
+      throw new Error("Bank 不能购买理财产品");
+    }
+
+    if (product.fixedAmount && amount !== product.fixedAmount) {
+      throw new Error(`${product.name} 固定储值 ${product.fixedAmount} 小熊币`);
+    }
+
+    const holding = makeLocalHolding({
+      account,
+      amount,
+      product,
+      note: payload.note || ""
+    });
     transaction = makeLocalTransaction({
       action,
       amount,
       from: account.id,
       to: "bank",
-      note: payload.note || "存入 Bank"
+      note: payload.note || `购买${product.name}`,
+      extra: {
+        holdingId: holding.id,
+        productId: product.id,
+        productName: product.name,
+        interest: holding.interest,
+        payout: holding.payout,
+        maturityAt: holding.maturityAt
+      }
     });
+    ledger.holdings.unshift(holding);
+    ledger.holdings = ledger.holdings.slice(0, 160);
   } else if (action === "pay" || action === "menu-order") {
     const from = getLocalCoinAccount(ledger, payload.from, "付款账户");
     const to = getLocalCoinAccount(ledger, payload.to, "收款账户");
@@ -839,6 +993,7 @@ function renderCoinAccounts() {
 function renderCoinLedger() {
   renderCoinAccounts();
   renderCoinQuery();
+  renderSavingsPanel();
 
   if (!coinLedger) {
     coinLedgerEl.innerHTML = `<p class="coin-empty">打开后会显示最近流水。</p>`;
@@ -897,6 +1052,91 @@ function renderStatCard(label, value) {
       <small>小熊币</small>
     </article>
   `;
+}
+
+function formatSavingsRate(rate) {
+  return `${Math.round(rate * 100)}%`;
+}
+
+function formatSavingsDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Date(value).toLocaleDateString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit"
+  });
+}
+
+function getSavingsDuration(product) {
+  return product.termDays ? `${product.termDays}天` : `${product.termMonths}个月`;
+}
+
+function getHoldingStatus(holding) {
+  if (holding.status === "redeemed") {
+    return "已返还";
+  }
+
+  const daysLeft = Math.ceil((new Date(holding.maturityAt).getTime() - Date.now()) / 86400000);
+  return daysLeft > 0 ? `还剩 ${daysLeft} 天` : "待返还";
+}
+
+function renderSavingsProducts() {
+  savingsProductsEl.innerHTML = savingsProducts.map((product) => {
+    const isDefault = product.id === DEFAULT_SAVINGS_PRODUCT_ID;
+    const amountLabel = product.fixedAmount ? `${product.fixedAmount} 小熊币` : "自定义本金";
+    const projectedInterest = product.fixedAmount ? calculateSavingsInterest(product.fixedAmount, product) : null;
+    const button = product.fixedAmount
+      ? `<button type="button" data-savings-product="${product.id}">购买</button>`
+      : `<button type="button" data-savings-product="${product.id}">填入表单</button>`;
+
+    return `
+      <article class="savings-product-card ${isDefault ? "is-default" : ""}">
+        <div>
+          <span>${isDefault ? "默认产品" : "限时产品"}</span>
+          <strong>${product.name}</strong>
+          <p>${product.summary}</p>
+        </div>
+        <dl>
+          <div><dt>本金</dt><dd>${amountLabel}</dd></div>
+          <div><dt>期限</dt><dd>${getSavingsDuration(product)}</dd></div>
+          <div><dt>月利率</dt><dd>${formatSavingsRate(product.monthlyRate)}</dd></div>
+          ${projectedInterest === null ? "" : `<div><dt>预计利息</dt><dd>${projectedInterest}</dd></div>`}
+        </dl>
+        ${button}
+      </article>
+    `;
+  }).join("");
+}
+
+function renderSavingsHoldings() {
+  const holdings = coinLedger?.holdings || [];
+
+  if (!holdings.length) {
+    savingsHoldingsEl.innerHTML = `<p class="coin-empty">还没有购买理财产品。</p>`;
+    return;
+  }
+
+  savingsHoldingsEl.innerHTML = holdings.slice(0, 12).map((holding) => `
+    <article class="savings-holding-card ${holding.status === "redeemed" ? "is-redeemed" : ""}">
+      <div>
+        <span>${getAccountName(holding.accountId)} · ${getHoldingStatus(holding)}</span>
+        <strong>${holding.productName}</strong>
+        <p>到期 ${formatSavingsDate(holding.maturityAt)} · 本金 ${holding.principal} + 利息 ${holding.interest}</p>
+      </div>
+      <strong>${holding.payout}</strong>
+    </article>
+  `).join("");
+}
+
+function renderSavingsPanel() {
+  if (!savingsProductsEl || !savingsHoldingsEl) {
+    return;
+  }
+
+  renderSavingsProducts();
+  renderSavingsHoldings();
 }
 
 function renderCoinQuery() {
@@ -966,6 +1206,14 @@ function getDefaultPayToAccount(fromAccountId) {
   return "nono";
 }
 
+function getDefaultSavingsAccount() {
+  if (activeAccount?.id && TRANSFER_ACCOUNTS.includes(activeAccount.id)) {
+    return activeAccount.id;
+  }
+
+  return "nono";
+}
+
 function setCoinMode(mode) {
   const requestedMode = COIN_MODE_CONFIG[mode] ? mode : getDefaultCoinMode();
   coinMode = canUseCoinMode(requestedMode) ? requestedMode : getDefaultCoinMode();
@@ -979,6 +1227,7 @@ function setCoinMode(mode) {
 
   coinFormEl.hidden = isQueryMode;
   coinQueryPanelEl.hidden = !isQueryMode;
+  savingsPanelEl.hidden = coinMode !== "save";
 
   if (isQueryMode) {
     renderSelectOptions(coinQueryAccountEl, ACCOUNT_IDS, coinQueryAccountEl.value || "onetwo");
@@ -989,8 +1238,14 @@ function setCoinMode(mode) {
   coinFromLabelEl.textContent = config.fromLabel;
   coinSubmitEl.textContent = config.submitLabel;
   coinToFieldEl.hidden = !config.showTo;
+  coinAmountEl.placeholder = coinMode === "save" ? "自定义本金" : "1";
+  coinNoteEl.placeholder = coinMode === "save" ? "定期储蓄备注..." : "晚饭、奖励、迟到...";
 
-  const fromAccount = coinMode === "pay" ? getDefaultPayFromAccount() : config.fromAccounts[0];
+  const fromAccount = coinMode === "pay"
+    ? getDefaultPayFromAccount()
+    : coinMode === "save"
+      ? getDefaultSavingsAccount()
+      : config.fromAccounts[0];
   renderSelectOptions(coinFromEl, config.fromAccounts, fromAccount);
 
   if (config.showTo) {
@@ -1013,6 +1268,7 @@ async function fetchCoinLedger() {
     if (!response.ok) {
       if (isLocalPreview() && shouldUseLocalFallback(response)) {
         coinLedger = readLocalLedger();
+        savingsProducts = SAVINGS_PRODUCTS;
         renderCoinLedger();
         return { ledger: coinLedger, localFallback: true };
       }
@@ -1021,11 +1277,13 @@ async function fetchCoinLedger() {
     }
 
     coinLedger = data.ledger;
+    savingsProducts = Array.isArray(data.products) ? data.products : SAVINGS_PRODUCTS;
     renderCoinLedger();
     return data;
   } catch (error) {
     if (isLocalPreview() && shouldUseLocalFallback(error)) {
       coinLedger = readLocalLedger();
+      savingsProducts = SAVINGS_PRODUCTS;
       renderCoinLedger();
       return { ledger: coinLedger, localFallback: true };
     }
@@ -1050,6 +1308,7 @@ async function postCoinOperation(payload) {
       if (isLocalPreview() && shouldUseLocalFallback(response)) {
         const localData = applyLocalCoinOperation(payload);
         coinLedger = localData.ledger;
+        savingsProducts = SAVINGS_PRODUCTS;
         renderCoinLedger();
         return localData;
       }
@@ -1058,12 +1317,14 @@ async function postCoinOperation(payload) {
     }
 
     coinLedger = data.ledger;
+    savingsProducts = Array.isArray(data.products) ? data.products : SAVINGS_PRODUCTS;
     renderCoinLedger();
     return data;
   } catch (error) {
     if (isLocalPreview() && shouldUseLocalFallback(error)) {
       const localData = applyLocalCoinOperation(payload);
       coinLedger = localData.ledger;
+      savingsProducts = SAVINGS_PRODUCTS;
       renderCoinLedger();
       return localData;
     }
@@ -1114,6 +1375,10 @@ async function handleCoinFormSubmit(event) {
     payload.account = coinFromEl.value;
   }
 
+  if (coinMode === "save") {
+    payload.productId = DEFAULT_SAVINGS_PRODUCT_ID;
+  }
+
   if (coinMode === "pay") {
     payload.from = coinFromEl.value;
     payload.to = coinToEl.value;
@@ -1143,6 +1408,39 @@ async function handleCoinFormSubmit(event) {
     showToast(error.message);
   } finally {
     coinSubmitEl.disabled = false;
+  }
+}
+
+async function buySavingsProduct(productId) {
+  const product = getSavingsProduct(productId);
+
+  if (!product.fixedAmount) {
+    setCoinMode("save");
+    coinAmountEl.focus();
+    showToast("填写本金后即可购买默认定期。");
+    return;
+  }
+
+  const account = TRANSFER_ACCOUNTS.includes(coinFromEl.value) ? coinFromEl.value : getDefaultSavingsAccount();
+  const availableBalance = Number(coinLedger?.accounts?.[account]?.balance ?? 0);
+
+  if (availableBalance < product.fixedAmount) {
+    showToast(`${getAccountName(account)} 余额不足，购买这款产品需要 ${product.fixedAmount} 小熊币。`);
+    return;
+  }
+
+  try {
+    const data = await postCoinOperation({
+      action: "save",
+      amount: product.fixedAmount,
+      account,
+      actor: activeAccount?.id || "",
+      productId: product.id,
+      note: `购买${product.name}`
+    });
+    showToast(`${data.transaction.label}已记账，${product.name}购买成功。`);
+  } catch (error) {
+    showToast(error.message);
   }
 }
 
@@ -1356,9 +1654,20 @@ async function shareOrderMessage() {
 document.addEventListener("click", (event) => {
   const actionButton = event.target.closest("[data-action]");
   const detailButton = event.target.closest("[data-open-detail]");
+  const savingsButton = event.target.closest("[data-savings-product]");
 
   if (detailButton) {
     openDetail(detailButton.dataset.openDetail);
+    return;
+  }
+
+  if (savingsButton) {
+    if (!activeAccount) {
+      requireLogin("请先登录账户。");
+      return;
+    }
+
+    buySavingsProduct(savingsButton.dataset.savingsProduct);
     return;
   }
 

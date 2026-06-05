@@ -869,6 +869,136 @@ button:disabled {
   display: none;
 }
 
+.savings-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.savings-panel[hidden] {
+  display: none;
+}
+
+.savings-note {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(36, 23, 20, 0.1);
+  border-radius: 8px;
+  background: rgba(57, 113, 94, 0.1);
+}
+
+.savings-note strong {
+  color: var(--moss);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.savings-note span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.savings-product-list,
+.savings-holding-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.savings-product-card,
+.savings-holding-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(36, 23, 20, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 248, 237, 0.68);
+}
+
+.savings-product-card.is-default {
+  background: rgba(235, 190, 96, 0.16);
+}
+
+.savings-product-card span,
+.savings-holding-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.savings-product-card strong,
+.savings-holding-card strong {
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.savings-product-card p,
+.savings-holding-card p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.savings-product-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.savings-product-card dl div {
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.savings-product-card dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.savings-product-card dd {
+  margin: 2px 0 0;
+  color: var(--moss);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.savings-product-card button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--moss);
+  color: #fff9ef;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.savings-holding-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.savings-holding-card > strong {
+  color: var(--rouge);
+  font-family:
+    "Georgia",
+    "Times New Roman",
+    serif;
+  font-size: 28px;
+}
+
+.savings-holding-card.is-redeemed {
+  opacity: 0.72;
+}
+
 .coin-transfer-row {
   display: grid;
   grid-template-columns: 1fr;

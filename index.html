@@ -171,6 +171,27 @@
             <button class="coin-submit-button" type="submit" data-coin-submit>记一笔</button>
           </form>
 
+          <section class="savings-panel" data-savings-panel hidden aria-label="理财产品和已购买储蓄">
+            <div class="savings-note">
+              <strong>收款账户固定 Bank</strong>
+              <span>默认储蓄为 30 天定期，月利率 3%，到期自动返还本金和利息。</span>
+            </div>
+            <div>
+              <div class="coin-query-title">
+                <span>SAVINGS</span>
+                <strong>当前理财产品</strong>
+              </div>
+              <div class="savings-product-list" data-savings-products></div>
+            </div>
+            <div>
+              <div class="coin-query-title">
+                <span>HOLDINGS</span>
+                <strong>已购买理财</strong>
+              </div>
+              <div class="savings-holding-list" data-savings-holdings></div>
+            </div>
+          </section>
+
           <section class="coin-query-panel" data-coin-query hidden aria-label="查询储值和账户余额">
             <div class="coin-query-controls">
               <label>
