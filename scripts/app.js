@@ -107,8 +107,9 @@ const COIN_MODE_CONFIG = {
   save: {
     fromLabel: "储蓄账户",
     submitLabel: "购买30天定期",
-    showTo: false,
-    fromAccounts: TRANSFER_ACCOUNTS
+    showTo: true,
+    fromAccounts: TRANSFER_ACCOUNTS,
+    toAccounts: ["bank"]
   },
   query: {
     fromLabel: "查询账户",
@@ -1248,6 +1249,8 @@ function setCoinMode(mode) {
   coinFromLabelEl.textContent = config.fromLabel;
   coinSubmitEl.textContent = config.submitLabel;
   coinToFieldEl.hidden = !config.showTo;
+  coinToFieldEl.querySelector("span").textContent = coinMode === "save" ? "收款账户（固定）" : "收款账户";
+  coinToEl.disabled = coinMode === "save";
   coinAmountEl.placeholder = coinMode === "save" ? "自定义本金" : "1";
   coinNoteEl.placeholder = coinMode === "save" ? "定期储蓄备注..." : "晚饭、奖励、迟到...";
 
@@ -1259,7 +1262,7 @@ function setCoinMode(mode) {
   renderSelectOptions(coinFromEl, config.fromAccounts, fromAccount);
 
   if (config.showTo) {
-    renderSelectOptions(coinToEl, config.toAccounts, coinMode === "pay" ? getDefaultPayToAccount(fromAccount) : config.toAccounts[0]);
+    renderSelectOptions(coinToEl, config.toAccounts, coinMode === "pay" ? getDefaultPayToAccount(fromAccount) : "bank");
   }
 }
 
