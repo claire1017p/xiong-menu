@@ -42,8 +42,127 @@ body {
   color: var(--ink);
 }
 
+body.auth-required .app-shell,
+body.auth-required .order-bar {
+  display: none;
+}
+
+body.is-authenticated .login-screen {
+  display: none;
+}
+
 button {
   font: inherit;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.64;
+}
+
+.login-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+
+.login-card {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 18px;
+  padding: 24px 18px;
+  border: 1px solid rgba(36, 23, 20, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 248, 237, 0.9);
+  box-shadow: var(--shadow);
+}
+
+.login-card h2 {
+  margin: 0;
+  color: var(--rouge);
+  font-family:
+    "Noto Serif CJK SC",
+    "SimSun",
+    serif;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.login-form {
+  display: grid;
+  gap: 12px;
+}
+
+.login-form[hidden] {
+  display: none;
+}
+
+.login-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.login-form label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.login-form input,
+.login-form select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid rgba(36, 23, 20, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 248, 237, 0.92);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.login-form button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.login-form .secondary-login-button {
+  background: var(--moss);
+  color: #fff9ef;
+}
+
+.login-account-badge {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(57, 113, 94, 0.1);
+  color: var(--moss);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.login-message {
+  min-height: 18px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.login-message[data-tone="error"] {
+  color: var(--rouge);
 }
 
 .app-shell {
@@ -64,6 +183,14 @@ button {
 }
 
 .topbar > div {
+  min-width: 0;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -111,6 +238,38 @@ button {
   font-size: 0;
   font-weight: 900;
   box-shadow: 0 10px 20px rgba(30, 20, 16, 0.08);
+}
+
+.auth-pill {
+  min-height: 40px;
+  display: inline-grid;
+  align-content: center;
+  gap: 1px;
+  max-width: 86px;
+  padding: 6px 10px;
+  border: 1px solid rgba(36, 23, 20, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 248, 237, 0.82);
+  color: var(--moss);
+  box-shadow: 0 10px 20px rgba(30, 20, 16, 0.08);
+}
+
+.auth-pill span,
+.auth-pill small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-pill span {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.auth-pill small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
 }
 
 .coin-mini,
@@ -671,7 +830,7 @@ button {
 
 .coin-mode-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   overflow: hidden;
   border: 1px solid rgba(36, 23, 20, 0.12);
   border-radius: 999px;
@@ -697,26 +856,42 @@ button {
   gap: 12px;
 }
 
+.coin-form[hidden] {
+  display: none;
+}
+
+.coin-query-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.coin-query-panel[hidden] {
+  display: none;
+}
+
 .coin-transfer-row {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
 }
 
-.coin-form label {
+.coin-form label,
+.coin-query-controls label {
   display: grid;
   gap: 6px;
   min-width: 0;
 }
 
-.coin-form label span {
+.coin-form label span,
+.coin-query-controls label span {
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
 }
 
 .coin-form input,
-.coin-form select {
+.coin-form select,
+.coin-query-controls select {
   width: 100%;
   min-height: 44px;
   padding: 0 12px;
@@ -727,6 +902,72 @@ button {
   font: inherit;
   font-size: 15px;
   font-weight: 800;
+}
+
+.coin-query-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  align-items: end;
+  gap: 10px;
+}
+
+.coin-query-controls button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--moss);
+  color: #fff9ef;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.coin-query-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.coin-query-card {
+  display: grid;
+  gap: 3px;
+  min-height: 84px;
+  padding: 12px;
+  border: 1px solid rgba(36, 23, 20, 0.1);
+  border-radius: 8px;
+  background: rgba(57, 113, 94, 0.08);
+}
+
+.coin-query-card span,
+.coin-query-card small,
+.coin-query-title span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.coin-query-card strong {
+  color: var(--moss);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.coin-query-ledger {
+  display: grid;
+  gap: 8px;
+}
+
+.coin-query-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.coin-query-title strong {
+  color: var(--moss);
+  font-size: 14px;
 }
 
 .coin-submit-button {

@@ -6,17 +6,58 @@
     <title>熊熊菜单</title>
     <link rel="stylesheet" href="styles/app.css" />
   </head>
-  <body>
+  <body class="auth-required">
+    <section class="login-screen" data-login-screen aria-label="小熊币登录">
+      <div class="login-card">
+        <p class="eyebrow">XIONG MENU LOGIN</p>
+        <h2>登录熊熊菜单</h2>
+
+        <form class="login-form" data-login-form>
+          <label>
+            <span>用户名</span>
+            <select data-login-username></select>
+          </label>
+          <label>
+            <span>密码</span>
+            <input data-login-password type="password" autocomplete="current-password" placeholder="首次登录请留空" />
+          </label>
+          <button type="submit" data-login-submit>登录</button>
+        </form>
+
+        <form class="login-form password-form" data-password-form hidden>
+          <div class="login-account-badge" data-password-account>Nono</div>
+          <label>
+            <span>新密码</span>
+            <input data-new-password type="password" autocomplete="new-password" minlength="4" placeholder="至少 4 位" />
+          </label>
+          <label>
+            <span>确认新密码</span>
+            <input data-confirm-password type="password" autocomplete="new-password" minlength="4" placeholder="再输入一次" />
+          </label>
+          <button type="submit" data-password-submit>保存密码并进入</button>
+          <button class="secondary-login-button" type="button" data-action="back-login">返回登录</button>
+        </form>
+
+        <p class="login-message" data-login-message role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
     <main class="app-shell" aria-label="熊熊菜单点菜网页">
       <header class="topbar">
         <div>
           <p class="eyebrow">DINNER AT HOME</p>
           <h1>熊熊菜单</h1>
         </div>
-        <button class="coin-pill" type="button" data-action="open-wallet" aria-label="打开小熊币管理">
-          <span class="coin-mini" aria-hidden="true"></span>
-          小熊币
-        </button>
+        <div class="topbar-actions">
+          <button class="auth-pill" type="button" data-action="logout" data-auth-status hidden aria-label="退出登录">
+            <span data-auth-user></span>
+            <small>退出</small>
+          </button>
+          <button class="coin-pill" type="button" data-action="open-wallet" aria-label="打开小熊币管理">
+            <span class="coin-mini" aria-hidden="true"></span>
+            小熊币
+          </button>
+        </div>
       </header>
 
       <section class="chef-note" aria-label="今日菜单说明">
@@ -101,6 +142,7 @@
             <button type="button" data-coin-mode="fine">罚款</button>
             <button type="button" data-coin-mode="pay">支付</button>
             <button type="button" data-coin-mode="save">储蓄</button>
+            <button type="button" data-coin-mode="query">查询</button>
           </div>
 
           <form class="coin-form" data-coin-form>
@@ -128,6 +170,19 @@
 
             <button class="coin-submit-button" type="submit" data-coin-submit>记一笔</button>
           </form>
+
+          <section class="coin-query-panel" data-coin-query hidden aria-label="查询储值和账户余额">
+            <div class="coin-query-controls">
+              <label>
+                <span>查询账户</span>
+                <select data-coin-query-account></select>
+              </label>
+              <button type="button" data-coin-refresh>刷新</button>
+            </div>
+
+            <div class="coin-query-summary" data-coin-query-summary></div>
+            <div class="coin-query-ledger" data-coin-query-ledger></div>
+          </section>
         </section>
 
         <section class="coin-ledger-section" aria-label="小熊币流水">

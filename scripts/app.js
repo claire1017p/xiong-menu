@@ -51,6 +51,10 @@ const dishes = {
 
 const ORDER_FORM_NAME = "xiong-menu-order";
 const COIN_API_URL = "/.netlify/functions/xiong-coins";
+const AUTH_API_URL = "/.netlify/functions/xiong-auth";
+const AUTH_SESSION_KEY = "xiong-active-account";
+const LOCAL_AUTH_KEY = "xiong-local-auth-v1";
+const LOCAL_LEDGER_KEY = "xiong-local-ledger-v1";
 const ACCOUNT_IDS = ["nono", "onetwo", "bank"];
 const TRANSFER_ACCOUNTS = ["nono", "onetwo"];
 const ACCOUNT_NAMES = {
@@ -84,6 +88,12 @@ const COIN_MODE_CONFIG = {
     submitLabel: "存入 Bank",
     showTo: false,
     fromAccounts: TRANSFER_ACCOUNTS
+  },
+  query: {
+    fromLabel: "查询账户",
+    submitLabel: "刷新查询",
+    showTo: false,
+    fromAccounts: ACCOUNT_IDS
   }
 };
 
@@ -119,6 +129,19 @@ const dialogImageEl = document.querySelector("[data-dialog-image]");
 const dialogKickerEl = document.querySelector("[data-dialog-kicker]");
 const dialogTitleEl = document.querySelector("[data-dialog-title]");
 const dialogDescEl = document.querySelector("[data-dialog-desc]");
+const loginScreenEl = document.querySelector("[data-login-screen]");
+const loginFormEl = document.querySelector("[data-login-form]");
+const loginUsernameEl = document.querySelector("[data-login-username]");
+const loginPasswordEl = document.querySelector("[data-login-password]");
+const loginSubmitEl = document.querySelector("[data-login-submit]");
+const passwordFormEl = document.querySelector("[data-password-form]");
+const passwordAccountEl = document.querySelector("[data-password-account]");
+const newPasswordEl = document.querySelector("[data-new-password]");
+const confirmPasswordEl = document.querySelector("[data-confirm-password]");
+const passwordSubmitEl = document.querySelector("[data-password-submit]");
+const loginMessageEl = document.querySelector("[data-login-message]");
+const authStatusEl = document.querySelector("[data-auth-status]");
+const authUserEl = document.querySelector("[data-auth-user]");
 const orderDialogEl = document.querySelector("[data-order-dialog]");
 const orderMessageEl = document.querySelector("[data-order-message]");
 const orderSendStatusEl = document.querySelector("[data-order-send-status]");
@@ -133,11 +156,19 @@ const coinToEl = document.querySelector("[data-coin-to]");
 const coinAmountEl = document.querySelector("[data-coin-amount]");
 const coinNoteEl = document.querySelector("[data-coin-note]");
 const coinSubmitEl = document.querySelector("[data-coin-submit]");
+const coinQueryPanelEl = document.querySelector("[data-coin-query]");
+const coinQueryAccountEl = document.querySelector("[data-coin-query-account]");
+const coinQuerySummaryEl = document.querySelector("[data-coin-query-summary]");
+const coinQueryLedgerEl = document.querySelector("[data-coin-query-ledger]");
+const coinRefreshEl = document.querySelector("[data-coin-refresh]");
 
 let currentPage = 0;
 let toastTimer;
 let coinMode = "add";
 let coinLedger = null;
+let activeAccount = null;
+let pendingPasswordAccount = null;
+let pendingPassword = "";
 let isPlacingOrder = false;
 
 function renderPage() {
@@ -267,6 +298,489 @@ function renderSelectOptions(selectEl, accountIds, selectedId) {
     .join("");
 }
 
+function isLocalPreview() {
+  return ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
+}
+
+function shouldUseLocalFallback(responseOrError) {
+  if (responseOrError instanceof TypeError) {
+    return true;
+  }
+
+  if (responseOrError && typeof responseOrError.status === "number") {
+    return responseOrError.status === 404 || responseOrError.status === 405;
+  }
+
+  return false;
+}
+
+function getAccountIdByUsername(username) {
+  const normalized = String(username || "").trim().toLowerCase();
+  return ACCOUNT_IDS.find((id) => id === normalized || ACCOUNT_NAMES[id].toLowerCase() === normalized) || "";
+}
+
+function getPublicAccount(accountId) {
+  return {
+    id: accountId,
+    name: getAccountName(accountId)
+  };
+}
+
+function setLoginMessage(message, tone = "normal") {
+  loginMessageEl.textContent = message;
+  loginMessageEl.dataset.tone = tone;
+}
+
+function showLoginForm(message = "") {
+  pendingPasswordAccount = null;
+  pendingPassword = "";
+  passwordFormEl.hidden = true;
+  loginFormEl.hidden = false;
+  loginPasswordEl.value = "";
+  newPasswordEl.value = "";
+  confirmPasswordEl.value = "";
+  setLoginMessage(message);
+}
+
+function showPasswordForm(account, password) {
+  pendingPasswordAccount = account;
+  pendingPassword = password;
+  passwordAccountEl.textContent = `${account.name} 首次设置密码`;
+  loginFormEl.hidden = true;
+  passwordFormEl.hidden = false;
+  newPasswordEl.value = "";
+  confirmPasswordEl.value = "";
+  setLoginMessage("首次登录需要设置新密码，保存后会自动进入菜单。");
+  window.setTimeout(() => newPasswordEl.focus(), 0);
+}
+
+function saveAuthSession(account) {
+  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({
+    id: account.id,
+    name: account.name
+  }));
+}
+
+function applyAuthenticatedState(account) {
+  activeAccount = getPublicAccount(account.id);
+  saveAuthSession(activeAccount);
+  document.body.classList.remove("auth-required");
+  document.body.classList.add("is-authenticated");
+  authUserEl.textContent = activeAccount.name;
+  authStatusEl.hidden = false;
+  showLoginForm("");
+}
+
+function requireLogin(message = "") {
+  activeAccount = null;
+  sessionStorage.removeItem(AUTH_SESSION_KEY);
+  document.body.classList.add("auth-required");
+  document.body.classList.remove("is-authenticated");
+  authStatusEl.hidden = true;
+  showLoginForm(message);
+  window.setTimeout(() => loginPasswordEl.focus(), 0);
+}
+
+function readLocalAuth() {
+  const fallback = {
+    accounts: Object.fromEntries(ACCOUNT_IDS.map((id) => [
+      id,
+      { id, name: getAccountName(id), passwordSet: false, password: "" }
+    ]))
+  };
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(LOCAL_AUTH_KEY) || "null");
+
+    if (saved && typeof saved === "object") {
+      for (const id of ACCOUNT_IDS) {
+        const savedAccount = saved.accounts?.[id];
+
+        if (savedAccount && typeof savedAccount === "object") {
+          fallback.accounts[id].passwordSet = Boolean(savedAccount.passwordSet);
+          fallback.accounts[id].password = typeof savedAccount.password === "string" ? savedAccount.password : "";
+        }
+      }
+    }
+  } catch {
+    localStorage.removeItem(LOCAL_AUTH_KEY);
+  }
+
+  return fallback;
+}
+
+function writeLocalAuth(auth) {
+  localStorage.setItem(LOCAL_AUTH_KEY, JSON.stringify(auth));
+}
+
+function createDefaultLocalLedger() {
+  return {
+    version: 1,
+    accounts: {
+      nono: { id: "nono", name: "Nono", balance: 0 },
+      onetwo: { id: "onetwo", name: "Onetwo", balance: 0 },
+      bank: { id: "bank", name: "Bank", balance: 0 }
+    },
+    transactions: [],
+    updatedAt: null
+  };
+}
+
+function normalizeLocalLedger(savedLedger) {
+  const ledger = createDefaultLocalLedger();
+
+  if (savedLedger && typeof savedLedger === "object") {
+    for (const id of ACCOUNT_IDS) {
+      const savedBalance = Number(savedLedger.accounts?.[id]?.balance);
+      ledger.accounts[id].balance = Number.isFinite(savedBalance) ? savedBalance : 0;
+    }
+
+    if (Array.isArray(savedLedger.transactions)) {
+      ledger.transactions = savedLedger.transactions.slice(0, 120);
+    }
+
+    ledger.updatedAt = savedLedger.updatedAt || null;
+  }
+
+  return ledger;
+}
+
+function readLocalLedger() {
+  try {
+    return normalizeLocalLedger(JSON.parse(localStorage.getItem(LOCAL_LEDGER_KEY) || "null"));
+  } catch {
+    localStorage.removeItem(LOCAL_LEDGER_KEY);
+    return createDefaultLocalLedger();
+  }
+}
+
+function writeLocalLedger(ledger) {
+  localStorage.setItem(LOCAL_LEDGER_KEY, JSON.stringify(ledger));
+}
+
+function getLocalCoinAmount(value) {
+  const amount = Math.trunc(Number(value));
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("数量必须大于 0");
+  }
+
+  return amount;
+}
+
+function getLocalCoinAccount(ledger, accountId, fieldName) {
+  if (!ACCOUNT_IDS.includes(accountId)) {
+    throw new Error(`${fieldName} 不是有效账户`);
+  }
+
+  return ledger.accounts[accountId];
+}
+
+function makeLocalTransaction({ action, amount, from = null, to = null, note = "" }) {
+  const labels = {
+    add: "添加",
+    fine: "罚款",
+    pay: "支付",
+    save: "储蓄",
+    "menu-order": "菜单付款"
+  };
+  const createdAt = new Date().toISOString();
+
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    action,
+    label: labels[action] || action,
+    amount,
+    from,
+    to,
+    note: String(note || "").trim().slice(0, 80),
+    createdAt
+  };
+}
+
+function applyLocalCoinOperation(payload) {
+  const ledger = readLocalLedger();
+  const action = payload?.action;
+  const amount = getLocalCoinAmount(payload?.amount);
+  let transaction;
+
+  if (action === "add") {
+    const account = getLocalCoinAccount(ledger, payload.account, "添加账户");
+    transaction = makeLocalTransaction({
+      action,
+      amount,
+      to: account.id,
+      note: payload.note || "添加小熊币"
+    });
+  } else if (action === "fine") {
+    const account = getLocalCoinAccount(ledger, payload.account, "罚款账户");
+    transaction = makeLocalTransaction({
+      action,
+      amount,
+      from: account.id,
+      to: "bank",
+      note: payload.note || "罚款"
+    });
+  } else if (action === "save") {
+    const account = getLocalCoinAccount(ledger, payload.account, "储蓄账户");
+    transaction = makeLocalTransaction({
+      action,
+      amount,
+      from: account.id,
+      to: "bank",
+      note: payload.note || "存入 Bank"
+    });
+  } else if (action === "pay" || action === "menu-order") {
+    const from = getLocalCoinAccount(ledger, payload.from, "付款账户");
+    const to = getLocalCoinAccount(ledger, payload.to, "收款账户");
+
+    if (from.id === to.id) {
+      throw new Error("付款和收款不能是同一个账户");
+    }
+
+    transaction = makeLocalTransaction({
+      action,
+      amount,
+      from: from.id,
+      to: to.id,
+      note: payload.note || (action === "menu-order" ? "熊熊菜单下单" : "支付")
+    });
+  } else {
+    throw new Error("未知的小熊币操作");
+  }
+
+  if (transaction.from) {
+    ledger.accounts[transaction.from].balance -= transaction.amount;
+  }
+
+  if (transaction.to) {
+    ledger.accounts[transaction.to].balance += transaction.amount;
+  }
+
+  ledger.transactions.unshift(transaction);
+  ledger.transactions = ledger.transactions.slice(0, 120);
+  ledger.updatedAt = transaction.createdAt;
+  writeLocalLedger(ledger);
+
+  return { ledger, transaction, localFallback: true };
+}
+
+function runLocalAuthAction(payload) {
+  const auth = readLocalAuth();
+  const accountId = getAccountIdByUsername(payload?.username);
+
+  if (!accountId) {
+    throw new Error("用户名不是有效账户");
+  }
+
+  const account = auth.accounts[accountId];
+  const password = typeof payload?.password === "string" ? payload.password : "";
+
+  if (payload?.action === "login") {
+    if (!account.passwordSet) {
+      if (password !== "") {
+        throw new Error("首次登录密码请留空，然后设置新密码");
+      }
+
+      return {
+        account: getPublicAccount(accountId),
+        mustChangePassword: true
+      };
+    }
+
+    if (password !== account.password) {
+      throw new Error("用户名或密码不对");
+    }
+
+    return {
+      account: getPublicAccount(accountId),
+      mustChangePassword: false
+    };
+  }
+
+  if (payload?.action === "set-password") {
+    const newPassword = typeof payload?.newPassword === "string" ? payload.newPassword : "";
+
+    if (newPassword.trim().length < 4) {
+      throw new Error("新密码至少需要 4 位");
+    }
+
+    if (newPassword.length > 64) {
+      throw new Error("新密码不能超过 64 位");
+    }
+
+    if (account.passwordSet && password !== account.password) {
+      throw new Error("原密码不对");
+    }
+
+    if (!account.passwordSet && password !== "") {
+      throw new Error("首次设置密码时旧密码请留空");
+    }
+
+    account.password = newPassword;
+    account.passwordSet = true;
+    writeLocalAuth(auth);
+
+    return {
+      account: getPublicAccount(accountId),
+      mustChangePassword: false
+    };
+  }
+
+  throw new Error("未知的登录操作");
+}
+
+async function requestAuth(payload) {
+  try {
+    const response = await fetch(AUTH_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      if (isLocalPreview() && shouldUseLocalFallback(response)) {
+        return runLocalAuthAction(payload);
+      }
+
+      throw new Error(data.error || "登录失败");
+    }
+
+    return data;
+  } catch (error) {
+    if (isLocalPreview() && shouldUseLocalFallback(error)) {
+      return runLocalAuthAction(payload);
+    }
+
+    throw error;
+  }
+}
+
+function initializeAuth() {
+  renderSelectOptions(loginUsernameEl, ACCOUNT_IDS, "onetwo");
+
+  try {
+    const savedAccount = JSON.parse(sessionStorage.getItem(AUTH_SESSION_KEY) || "null");
+
+    if (savedAccount && ACCOUNT_IDS.includes(savedAccount.id)) {
+      applyAuthenticatedState(savedAccount);
+      return;
+    }
+  } catch {
+    sessionStorage.removeItem(AUTH_SESSION_KEY);
+  }
+
+  requireLogin();
+}
+
+async function handleLoginSubmit(event) {
+  event.preventDefault();
+  loginSubmitEl.disabled = true;
+  setLoginMessage("正在登录...");
+
+  try {
+    const data = await requestAuth({
+      action: "login",
+      username: loginUsernameEl.value,
+      password: loginPasswordEl.value
+    });
+
+    if (data.mustChangePassword) {
+      showPasswordForm(data.account, loginPasswordEl.value);
+      return;
+    }
+
+    applyAuthenticatedState(data.account);
+    showToast(`${data.account.name} 已登录。`);
+  } catch (error) {
+    setLoginMessage(error.message, "error");
+  } finally {
+    loginSubmitEl.disabled = false;
+  }
+}
+
+async function handlePasswordSubmit(event) {
+  event.preventDefault();
+
+  if (!pendingPasswordAccount) {
+    showLoginForm("请先登录账户。");
+    return;
+  }
+
+  if (newPasswordEl.value !== confirmPasswordEl.value) {
+    setLoginMessage("两次输入的新密码不一致。", "error");
+    return;
+  }
+
+  passwordSubmitEl.disabled = true;
+  setLoginMessage("正在保存密码...");
+
+  try {
+    const data = await requestAuth({
+      action: "set-password",
+      username: pendingPasswordAccount.id,
+      password: pendingPassword,
+      newPassword: newPasswordEl.value
+    });
+
+    applyAuthenticatedState(data.account);
+    showToast("密码已保存，登录成功。");
+  } catch (error) {
+    setLoginMessage(error.message, "error");
+  } finally {
+    passwordSubmitEl.disabled = false;
+  }
+}
+
+function logout() {
+  if (dialogEl.open) {
+    dialogEl.close();
+  }
+
+  if (orderDialogEl.open) {
+    orderDialogEl.close();
+  }
+
+  if (coinDialogEl.open) {
+    coinDialogEl.close();
+  }
+
+  requireLogin("已退出登录。");
+}
+
+function renderTransactionItems(transactions, emptyMessage) {
+  if (!transactions.length) {
+    return `<p class="coin-empty">${emptyMessage}</p>`;
+  }
+
+  return transactions
+    .map((transaction) => {
+      const from = transaction.from ? getAccountName(transaction.from) : "外部";
+      const to = transaction.to ? getAccountName(transaction.to) : "外部";
+      const route = transaction.from || transaction.to ? `${from} → ${to}` : transaction.label;
+      const note = transaction.note ? `<small>${escapeHtml(transaction.note)}</small>` : "";
+
+      return `
+        <article class="coin-ledger-item">
+          <div>
+            <strong>${escapeHtml(transaction.label)}</strong>
+            <span>${escapeHtml(route)}</span>
+            ${note}
+          </div>
+          <div>
+            <strong>${transaction.amount}</strong>
+            <time>${formatCoinTime(transaction.createdAt)}</time>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
 function renderCoinAccounts() {
   if (!coinLedger) {
     coinAccountsEl.innerHTML = `
@@ -293,49 +807,127 @@ function renderCoinAccounts() {
 
 function renderCoinLedger() {
   renderCoinAccounts();
+  renderCoinQuery();
 
   if (!coinLedger) {
     coinLedgerEl.innerHTML = `<p class="coin-empty">打开后会显示最近流水。</p>`;
     return;
   }
 
-  if (!coinLedger.transactions.length) {
-    coinLedgerEl.innerHTML = `<p class="coin-empty">还没有流水，先记一笔小熊币吧。</p>`;
+  coinLedgerEl.innerHTML = renderTransactionItems(
+    coinLedger.transactions.slice(0, 10),
+    "还没有流水，先记一笔小熊币吧。"
+  );
+}
+
+function getAccountStats(accountId) {
+  const transactions = coinLedger?.transactions || [];
+  const balance = Number(coinLedger?.accounts?.[accountId]?.balance ?? 0);
+  const stats = {
+    balance,
+    saved: 0,
+    fined: 0,
+    income: 0,
+    outgo: 0
+  };
+
+  for (const transaction of transactions) {
+    const amount = Number(transaction.amount) || 0;
+
+    if (transaction.to === accountId) {
+      stats.income += amount;
+    }
+
+    if (transaction.from === accountId) {
+      stats.outgo += amount;
+    }
+
+    if (transaction.action === "save" && transaction.to === "bank") {
+      if (accountId === "bank" || transaction.from === accountId) {
+        stats.saved += amount;
+      }
+    }
+
+    if (transaction.action === "fine" && transaction.to === "bank") {
+      if (accountId === "bank" || transaction.from === accountId) {
+        stats.fined += amount;
+      }
+    }
+  }
+
+  return stats;
+}
+
+function renderStatCard(label, value) {
+  return `
+    <article class="coin-query-card">
+      <span>${label}</span>
+      <strong>${value}</strong>
+      <small>小熊币</small>
+    </article>
+  `;
+}
+
+function renderCoinQuery() {
+  const selectedAccount = coinQueryAccountEl.value || "onetwo";
+
+  if (!coinQueryAccountEl.options.length) {
+    renderSelectOptions(coinQueryAccountEl, ACCOUNT_IDS, selectedAccount);
+  }
+
+  if (!coinLedger) {
+    coinQuerySummaryEl.innerHTML = `<p class="coin-empty">正在读取账户余额...</p>`;
+    coinQueryLedgerEl.innerHTML = "";
     return;
   }
 
-  coinLedgerEl.innerHTML = coinLedger.transactions
-    .slice(0, 10)
-    .map((transaction) => {
-      const from = transaction.from ? getAccountName(transaction.from) : "外部";
-      const to = transaction.to ? getAccountName(transaction.to) : "外部";
-      const route = transaction.from || transaction.to ? `${from} → ${to}` : transaction.label;
-      const note = transaction.note ? `<small>${escapeHtml(transaction.note)}</small>` : "";
+  const accountId = coinLedger.accounts[selectedAccount] ? selectedAccount : "onetwo";
+  const accountName = getAccountName(accountId);
+  const stats = getAccountStats(accountId);
+  const cards = accountId === "bank"
+    ? [
+        renderStatCard("Bank 余额", stats.balance),
+        renderStatCard("储值入账", stats.saved),
+        renderStatCard("罚款入账", stats.fined),
+        renderStatCard("入账合计", stats.income)
+      ]
+    : [
+        renderStatCard("账户余额", stats.balance),
+        renderStatCard("已储值", stats.saved),
+        renderStatCard("已罚款", stats.fined),
+        renderStatCard("余额+储值", stats.balance + stats.saved)
+      ];
+  const relatedTransactions = coinLedger.transactions
+    .filter((transaction) => transaction.from === accountId || transaction.to === accountId)
+    .slice(0, 8);
 
-      return `
-        <article class="coin-ledger-item">
-          <div>
-            <strong>${escapeHtml(transaction.label)}</strong>
-            <span>${escapeHtml(route)}</span>
-            ${note}
-          </div>
-          <div>
-            <strong>${transaction.amount}</strong>
-            <time>${formatCoinTime(transaction.createdAt)}</time>
-          </div>
-        </article>
-      `;
-    })
-    .join("");
+  coinQuerySummaryEl.innerHTML = cards.join("");
+  coinQueryLedgerEl.innerHTML = `
+    <div class="coin-query-title">
+      <span>${accountName}</span>
+      <strong>账户流水</strong>
+    </div>
+    ${renderTransactionItems(relatedTransactions, `${accountName} 还没有相关流水。`)}
+  `;
 }
 
 function setCoinMode(mode) {
   coinMode = COIN_MODE_CONFIG[mode] ? mode : "add";
   const config = COIN_MODE_CONFIG[coinMode];
+  const isQueryMode = coinMode === "query";
 
   document.querySelectorAll("[data-coin-mode]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.coinMode === coinMode);
   });
+
+  coinFormEl.hidden = isQueryMode;
+  coinQueryPanelEl.hidden = !isQueryMode;
+
+  if (isQueryMode) {
+    renderSelectOptions(coinQueryAccountEl, ACCOUNT_IDS, coinQueryAccountEl.value || "onetwo");
+    renderCoinQuery();
+    return;
+  }
 
   coinFromLabelEl.textContent = config.fromLabel;
   coinSubmitEl.textContent = config.submitLabel;
@@ -352,40 +944,74 @@ async function fetchCoinLedger() {
   renderCoinAccounts();
   coinLedgerEl.innerHTML = `<p class="coin-empty">正在读取线上账本...</p>`;
 
-  const response = await fetch(COIN_API_URL, {
-    headers: {
-      Accept: "application/json"
+  try {
+    const response = await fetch(COIN_API_URL, {
+      headers: {
+        Accept: "application/json"
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      if (isLocalPreview() && shouldUseLocalFallback(response)) {
+        coinLedger = readLocalLedger();
+        renderCoinLedger();
+        return { ledger: coinLedger, localFallback: true };
+      }
+
+      throw new Error(data.error || "读取小熊币账本失败");
     }
-  });
-  const data = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    throw new Error(data.error || "读取小熊币账本失败");
+    coinLedger = data.ledger;
+    renderCoinLedger();
+    return data;
+  } catch (error) {
+    if (isLocalPreview() && shouldUseLocalFallback(error)) {
+      coinLedger = readLocalLedger();
+      renderCoinLedger();
+      return { ledger: coinLedger, localFallback: true };
+    }
+
+    throw error;
   }
-
-  coinLedger = data.ledger;
-  renderCoinLedger();
-  return data;
 }
 
 async function postCoinOperation(payload) {
-  const response = await fetch(COIN_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-  const data = await response.json().catch(() => ({}));
+  try {
+    const response = await fetch(COIN_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    throw new Error(data.error || "小熊币操作失败");
+    if (!response.ok) {
+      if (isLocalPreview() && shouldUseLocalFallback(response)) {
+        const localData = applyLocalCoinOperation(payload);
+        coinLedger = localData.ledger;
+        renderCoinLedger();
+        return localData;
+      }
+
+      throw new Error(data.error || "小熊币操作失败");
+    }
+
+    coinLedger = data.ledger;
+    renderCoinLedger();
+    return data;
+  } catch (error) {
+    if (isLocalPreview() && shouldUseLocalFallback(error)) {
+      const localData = applyLocalCoinOperation(payload);
+      coinLedger = localData.ledger;
+      renderCoinLedger();
+      return localData;
+    }
+
+    throw error;
   }
-
-  coinLedger = data.ledger;
-  renderCoinLedger();
-  return data;
 }
 
 async function openWallet() {
@@ -402,6 +1028,10 @@ async function openWallet() {
 
 async function handleCoinFormSubmit(event) {
   event.preventDefault();
+
+  if (coinMode === "query") {
+    return;
+  }
 
   const amount = Math.trunc(Number(coinAmountEl.value));
 
@@ -436,6 +1066,21 @@ async function handleCoinFormSubmit(event) {
     showToast(error.message);
   } finally {
     coinSubmitEl.disabled = false;
+  }
+}
+
+async function refreshCoinQuery() {
+  coinRefreshEl.disabled = true;
+
+  try {
+    await fetchCoinLedger();
+    showToast("账户余额已刷新。");
+  } catch (error) {
+    coinQuerySummaryEl.innerHTML = `<p class="coin-empty">查询失败，请稍后再试。</p>`;
+    coinQueryLedgerEl.innerHTML = "";
+    showToast(error.message);
+  } finally {
+    coinRefreshEl.disabled = false;
   }
 }
 
@@ -632,6 +1277,21 @@ document.addEventListener("click", (event) => {
 
   const { action, dishId } = actionButton.dataset;
 
+  if (action === "back-login") {
+    showLoginForm("请重新登录。");
+    return;
+  }
+
+  if (action === "logout") {
+    logout();
+    return;
+  }
+
+  if (!activeAccount) {
+    requireLogin("请先登录账户。");
+    return;
+  }
+
   if (action === "increase") {
     changeDishCount(dishId, 1);
   }
@@ -701,7 +1361,12 @@ document.querySelectorAll("[data-coin-mode]").forEach((button) => {
   });
 });
 
+coinQueryAccountEl.addEventListener("change", renderCoinQuery);
+coinRefreshEl.addEventListener("click", refreshCoinQuery);
 coinFormEl.addEventListener("submit", handleCoinFormSubmit);
+loginFormEl.addEventListener("submit", handleLoginSubmit);
+passwordFormEl.addEventListener("submit", handlePasswordSubmit);
 
 renderPage();
 setCoinMode(coinMode);
+initializeAuth();
