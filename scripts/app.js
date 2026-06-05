@@ -210,7 +210,7 @@ function renderPage() {
 
       return `
         <article class="dish-card ${cardClass}" data-dish-id="${id}">
-          <img src="${dish.image}" alt="${dish.name}" />
+          <img src="${dish.image}" alt="${dish.name}" loading="lazy" decoding="async" />
           <div class="dish-overlay">
             <div class="dish-title-row">
               <div>

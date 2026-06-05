@@ -17,6 +17,22 @@
   --cute-sky: #d7f4ff;
   --cocoa: #684138;
   --shadow: 0 18px 38px rgba(104, 65, 56, 0.16);
+  --font-cheese:
+    "汉仪奶酪体简",
+    "汉仪奶酪体",
+    "HY NaiLaoTiJ",
+    "HYNaLaoTiJ",
+    "Aa奶酪体",
+    "奶酪体",
+    "FZYaoti",
+    "YouYuan",
+    "Yuanti SC",
+    "Microsoft YaHei UI",
+    "Microsoft YaHei",
+    "PingFang SC",
+    "Noto Sans CJK SC",
+    Arial,
+    sans-serif;
   --font-rounded:
     "YouYuan",
     "Yuanti SC",
@@ -98,14 +114,15 @@ button:disabled {
 .login-card h2 {
   margin: 0;
   color: var(--cute-rose);
-  font-family: var(--font-rounded);
-  font-size: 34px;
-  font-weight: 900;
+  font-family: var(--font-cheese);
+  font-size: 36px;
+  font-weight: 700;
   line-height: 1.08;
   text-shadow:
     0 2px 0 #fff,
-    0 4px 0 var(--cute-peach),
-    0 8px 18px rgba(216, 79, 104, 0.16);
+    0 4px 0 rgba(255, 211, 109, 0.38),
+    0 10px 18px rgba(244, 95, 143, 0.18);
+  -webkit-text-stroke: 0.35px rgba(239, 111, 145, 0.45);
 }
 
 .mascot-row {
@@ -118,9 +135,10 @@ button:disabled {
   display: block;
   height: 118px;
   overflow: hidden;
-  border: 1px solid rgba(104, 65, 56, 0.12);
   border-radius: 8px;
-  background: #fff;
+  border: 0;
+  background:
+    linear-gradient(135deg, rgba(255, 211, 109, 0.42), rgba(255, 159, 186, 0.22) 46%, rgba(199, 240, 236, 0.5));
   box-shadow: 0 10px 20px rgba(104, 65, 56, 0.1);
 }
 
@@ -133,46 +151,25 @@ button:disabled {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 12%;
+  filter: saturate(1.05) contrast(1.02);
+  mix-blend-mode: multiply;
+}
+
+.mascot-frame img {
+  padding: 5px;
+  object-fit: contain;
+}
+
+.mascot-frame.is-call img,
+.portal-mascot.is-call {
+  object-position: center center;
 }
 
 .mascot-frame.is-piggy img,
 .portal-mascot.is-piggy,
-.note-mascot.is-piggy,
-.order-mascot.is-piggy,
 .coin-heading-mascot.is-piggy {
-  object-position: center 8%;
-}
-
-.mascot-frame.is-calls img,
-.portal-mascot.is-calls,
-.note-mascot.is-calls,
-.order-mascot.is-calls,
-.coin-heading-mascot.is-calls {
-  object-position: center center;
-}
-
-.mascot-frame.is-snacks img,
-.portal-mascot.is-snacks,
-.note-mascot.is-snacks,
-.order-mascot.is-snacks,
-.coin-heading-mascot.is-snacks {
-  object-position: center 16%;
-}
-
-.mascot-frame.is-summer img,
-.portal-mascot.is-summer,
-.note-mascot.is-summer,
-.order-mascot.is-summer,
-.coin-heading-mascot.is-summer {
-  object-position: center 12%;
-}
-
-.mascot-frame.is-bedtime img,
-.portal-mascot.is-bedtime,
-.note-mascot.is-bedtime,
-.order-mascot.is-bedtime,
-.coin-heading-mascot.is-bedtime {
-  object-position: center 18%;
+  object-position: center 48%;
 }
 
 .login-form {
@@ -270,15 +267,15 @@ button:disabled {
 .portal-header h1 {
   margin: 4px 0 6px;
   color: var(--cute-rose);
-  font-family: var(--font-rounded);
-  font-size: clamp(46px, 13vw, 64px);
+  font-family: var(--font-cheese);
+  font-size: clamp(42px, 11vw, 58px);
   line-height: 1.02;
-  font-weight: 900;
+  font-weight: 700;
   text-shadow:
     0 2px 0 #fff,
-    0 5px 0 var(--cute-peach),
-    0 8px 0 rgba(255, 211, 109, 0.22),
-    0 16px 30px rgba(216, 79, 104, 0.18);
+    0 5px 0 rgba(255, 211, 109, 0.42),
+    0 12px 24px rgba(244, 95, 143, 0.18);
+  -webkit-text-stroke: 0.4px rgba(239, 111, 145, 0.44);
 }
 
 .portal-header p:last-child {
@@ -349,9 +346,10 @@ button:disabled {
   right: 16px;
   width: 104px;
   height: 112px;
-  border: 1px solid rgba(104, 65, 56, 0.12);
+  border: 0;
   border-radius: 8px;
-  background: #fff;
+  background:
+    linear-gradient(135deg, rgba(255, 211, 109, 0.34), rgba(255, 159, 186, 0.2) 48%, rgba(199, 240, 236, 0.54));
   box-shadow: 0 12px 24px rgba(104, 65, 56, 0.12);
   pointer-events: none;
 }
@@ -364,8 +362,9 @@ button:disabled {
 
 .portal-entry strong {
   color: var(--cocoa);
-  font-family: var(--font-rounded);
-  font-size: 34px;
+  font-family: var(--font-cheese);
+  font-size: 32px;
+  font-weight: 700;
   line-height: 1.05;
 }
 
@@ -427,10 +426,10 @@ button:disabled {
 .topbar h1 {
   margin: 4px 0 0;
   color: var(--cocoa);
-  font-family: var(--font-rounded);
-  font-size: clamp(40px, 12vw, 48px);
+  font-family: var(--font-cheese);
+  font-size: clamp(38px, 10vw, 46px);
   line-height: 0.98;
-  font-weight: 900;
+  font-weight: 700;
   text-shadow:
     0 2px 0 #fff,
     0 4px 0 rgba(255, 211, 109, 0.45);
@@ -549,16 +548,18 @@ button:disabled {
 .note-mascot {
   width: 78px;
   height: 78px;
-  border: 1px solid rgba(104, 65, 56, 0.12);
+  border: 0;
   border-radius: 8px;
-  background: #fff;
+  background:
+    linear-gradient(135deg, rgba(255, 211, 109, 0.34), rgba(255, 159, 186, 0.2) 48%, rgba(199, 240, 236, 0.54));
   box-shadow: 0 10px 20px rgba(104, 65, 56, 0.1);
 }
 
 .chef-note strong {
   color: var(--rouge);
-  font-family: var(--font-rounded);
+  font-family: var(--font-cheese);
   font-size: 30px;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -679,9 +680,10 @@ button:disabled {
 .dish-title-row h2 {
   margin: 6px 0 0;
   color: #fff9ef;
-  font-family: var(--font-rounded);
+  font-family: var(--font-cheese);
   font-size: clamp(44px, 13vw, 66px);
   line-height: 0.95;
+  font-weight: 700;
   text-shadow:
     0 2px 0 rgba(244, 95, 143, 0.88),
     0 7px 18px rgba(0, 0, 0, 0.58);
@@ -885,8 +887,9 @@ button:disabled {
 .dialog-body h3 {
   margin: 6px 0 10px;
   color: var(--rouge);
-  font-family: var(--font-rounded);
+  font-family: var(--font-cheese);
   font-size: 42px;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -909,9 +912,10 @@ button:disabled {
   width: 92px;
   height: 78px;
   margin: -4px 34px -8px 0;
-  border: 1px solid rgba(104, 65, 56, 0.12);
+  border: 0;
   border-radius: 8px;
-  background: #fff;
+  background:
+    linear-gradient(135deg, rgba(255, 211, 109, 0.34), rgba(255, 159, 186, 0.2) 48%, rgba(199, 240, 236, 0.54));
   box-shadow: 0 10px 20px rgba(104, 65, 56, 0.1);
 }
 
@@ -935,8 +939,9 @@ button:disabled {
 .order-dialog-body h3 {
   margin: 0;
   color: var(--rouge);
-  font-family: var(--font-rounded);
+  font-family: var(--font-cheese);
   font-size: 30px;
+  font-weight: 700;
   line-height: 1.1;
 }
 
@@ -1003,9 +1008,10 @@ button:disabled {
 .coin-heading-mascot {
   width: 76px;
   height: 76px;
-  border: 1px solid rgba(104, 65, 56, 0.12);
+  border: 0;
   border-radius: 8px;
-  background: #fff;
+  background:
+    linear-gradient(135deg, rgba(255, 211, 109, 0.34), rgba(255, 159, 186, 0.2) 48%, rgba(199, 240, 236, 0.54));
   box-shadow: 0 10px 20px rgba(104, 65, 56, 0.1);
 }
 
@@ -1020,8 +1026,9 @@ button:disabled {
 .coin-dialog-heading h3 {
   margin: 0;
   color: var(--rouge);
-  font-family: var(--font-rounded);
+  font-family: var(--font-cheese);
   font-size: 30px;
+  font-weight: 700;
   line-height: 1.1;
 }
 
