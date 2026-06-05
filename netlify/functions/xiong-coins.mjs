@@ -206,7 +206,7 @@ export function applyOperation(ledger, payload) {
 
 async function readLedger() {
   const store = getStore(STORE_NAME);
-  const savedLedger = await store.get(LEDGER_KEY, { type: "json" });
+  const savedLedger = await store.get(LEDGER_KEY, { type: "json", consistency: "strong" });
   return normalizeLedger(savedLedger);
 }
 
