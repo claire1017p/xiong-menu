@@ -11,6 +11,10 @@
       <div class="login-card">
         <p class="eyebrow">XIONG PAY LOGIN</p>
         <h2>登录熊付宝</h2>
+        <div class="mascot-row" aria-hidden="true">
+          <span class="mascot-frame is-bubu"><img src="assets/bubu-onetwo-love.jpg" alt="" /></span>
+          <span class="mascot-frame is-onetwo"><img src="assets/bubu-onetwo-love.jpg" alt="" /></span>
+        </div>
 
         <form class="login-form" data-login-form>
           <label>
@@ -57,11 +61,13 @@
 
       <div class="portal-entry-grid">
         <button class="portal-entry is-menu" type="button" data-action="enter-menu">
+          <img class="portal-mascot is-bubu" src="assets/bubu-onetwo-love.jpg" alt="" aria-hidden="true" />
           <span>DINNER</span>
           <strong>熊熊菜单</strong>
           <small>打开熊熊菜单，下单后自动结算小熊币。</small>
         </button>
         <button class="portal-entry is-coin" type="button" data-action="enter-wallet">
+          <img class="portal-mascot is-onetwo" src="assets/bubu-onetwo-love.jpg" alt="" aria-hidden="true" />
           <span>COINS</span>
           <strong>小熊币管理</strong>
           <small>查看余额、流水、储蓄和理财产品。</small>
@@ -89,8 +95,11 @@
       </header>
 
       <section class="chef-note" aria-label="今日菜单说明">
-        <p>今晚主厨认真营业。你点菜，我下厨。</p>
-        <strong data-page-title>第 1 页 · 招牌热菜</strong>
+        <div>
+          <p>今晚主厨认真营业。你点菜，我下厨。</p>
+          <strong data-page-title>第 1 页 · 招牌热菜</strong>
+        </div>
+        <img class="note-mascot is-bubu" src="assets/bubu-onetwo-love.jpg" alt="" aria-hidden="true" />
       </section>
 
       <nav class="page-controls" aria-label="菜单翻页">
@@ -143,6 +152,7 @@
     <dialog class="order-dialog" data-order-dialog>
       <button class="close-button" type="button" data-close-order-dialog aria-label="关闭">×</button>
       <div class="order-dialog-body">
+        <img class="order-mascot is-onetwo" src="assets/bubu-onetwo-love.jpg" alt="" aria-hidden="true" />
         <p>ORDER FOR CHEF</p>
         <h3>下单成功</h3>
         <pre data-order-message></pre>
@@ -158,8 +168,11 @@
       <button class="close-button" type="button" data-close-coin-dialog aria-label="关闭">×</button>
       <div class="coin-dialog-body">
         <div class="coin-dialog-heading">
-          <p>XIONG COIN BANK</p>
-          <h3>小熊币管理</h3>
+          <div>
+            <p>XIONG COIN BANK</p>
+            <h3>小熊币管理</h3>
+          </div>
+          <img class="coin-heading-mascot is-onetwo" src="assets/bubu-onetwo-love.jpg" alt="" aria-hidden="true" />
         </div>
 
         <section class="coin-account-grid" data-coin-accounts aria-label="小熊币账户"></section>

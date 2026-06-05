@@ -10,6 +10,10 @@
   --tomato: #c9583f;
   --gold: #e4b865;
   --cream: #fff3d4;
+  --cute-pink: #ee7d91;
+  --cute-rose: #d84f68;
+  --cute-peach: #ffe1d6;
+  --cocoa: #6f5047;
   --shadow: 0 18px 42px rgba(30, 20, 16, 0.2);
   font-family:
     "Microsoft YaHei",
@@ -84,13 +88,62 @@ button:disabled {
 
 .login-card h2 {
   margin: 0;
-  color: var(--rouge);
+  color: var(--cute-rose);
   font-family:
-    "Noto Serif CJK SC",
-    "SimSun",
-    serif;
-  font-size: 30px;
-  line-height: 1.1;
+    "YouYuan",
+    "Microsoft YaHei",
+    "PingFang SC",
+    "Noto Sans CJK SC",
+    sans-serif;
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.08;
+  text-shadow:
+    0 2px 0 var(--cute-peach),
+    0 8px 18px rgba(216, 79, 104, 0.16);
+}
+
+.mascot-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mascot-frame {
+  display: block;
+  height: 128px;
+  overflow: hidden;
+  border: 1px solid rgba(36, 23, 20, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(30, 20, 16, 0.1);
+}
+
+.mascot-frame img,
+.portal-mascot,
+.note-mascot,
+.order-mascot,
+.coin-heading-mascot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mascot-frame.is-bubu img,
+.portal-mascot.is-bubu,
+.note-mascot.is-bubu,
+.order-mascot.is-bubu,
+.coin-heading-mascot.is-bubu {
+  object-position: center 15%;
+}
+
+.mascot-frame.is-onetwo img,
+.portal-mascot.is-onetwo,
+.note-mascot.is-onetwo,
+.order-mascot.is-onetwo,
+.coin-heading-mascot.is-onetwo {
+  object-position: center 86%;
 }
 
 .login-form {
@@ -186,23 +239,32 @@ button:disabled {
 
 .portal-header h1 {
   margin: 4px 0 6px;
-  color: var(--rouge);
+  color: var(--cute-rose);
   font-family:
-    "STXingkai",
-    "KaiTi",
-    "Noto Serif CJK SC",
-    serif;
-  font-size: clamp(48px, 14vw, 68px);
-  line-height: 0.98;
+    "YouYuan",
+    "Microsoft YaHei",
+    "PingFang SC",
+    "Noto Sans CJK SC",
+    sans-serif;
+  font-size: clamp(46px, 13vw, 64px);
+  line-height: 1.02;
   font-weight: 900;
-  text-shadow: 0 2px 0 rgba(228, 184, 101, 0.42);
+  text-shadow:
+    0 3px 0 var(--cute-peach),
+    0 7px 0 rgba(228, 184, 101, 0.22),
+    0 16px 30px rgba(216, 79, 104, 0.18);
 }
 
 .portal-header p:last-child {
   margin: 0;
-  color: var(--muted);
+  color: var(--cocoa);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 900;
+}
+
+.login-card > .eyebrow,
+.portal-header .eyebrow {
+  color: var(--cocoa);
 }
 
 .portal-logout,
@@ -239,16 +301,31 @@ button:disabled {
 }
 
 .portal-entry {
+  position: relative;
   display: grid;
   gap: 8px;
   min-height: 152px;
-  padding: 20px;
+  padding: 20px 136px 20px 20px;
+  overflow: hidden;
   border: 1px solid rgba(36, 23, 20, 0.12);
   border-radius: 8px;
   background: rgba(255, 248, 237, 0.86);
   color: var(--ink);
   text-align: left;
   box-shadow: var(--shadow);
+}
+
+.portal-mascot {
+  position: absolute;
+  top: 18px;
+  right: 16px;
+  width: 104px;
+  height: 112px;
+  border: 1px solid rgba(36, 23, 20, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 24px rgba(30, 20, 16, 0.12);
+  pointer-events: none;
 }
 
 .portal-entry span {
@@ -435,11 +512,22 @@ button:disabled {
 
 .chef-note {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  align-items: center;
   gap: 8px;
   padding: 18px;
   border: 1px solid rgba(36, 23, 20, 0.12);
   border-radius: 8px;
   background: rgba(255, 248, 237, 0.78);
+}
+
+.note-mascot {
+  width: 78px;
+  height: 78px;
+  border: 1px solid rgba(36, 23, 20, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(30, 20, 16, 0.1);
 }
 
 .chef-note strong {
@@ -801,6 +889,17 @@ button:disabled {
   padding: 22px 18px 18px;
 }
 
+.order-mascot {
+  justify-self: end;
+  width: 92px;
+  height: 78px;
+  margin: -4px 34px -8px 0;
+  border: 1px solid rgba(36, 23, 20, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(30, 20, 16, 0.1);
+}
+
 .order-dialog-body p {
   margin: 0;
   color: var(--muted);
@@ -883,8 +982,19 @@ button:disabled {
 
 .coin-dialog-heading {
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  align-items: center;
+  gap: 10px;
   padding-right: 42px;
+}
+
+.coin-heading-mascot {
+  width: 76px;
+  height: 76px;
+  border: 1px solid rgba(36, 23, 20, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(30, 20, 16, 0.1);
 }
 
 .coin-dialog-heading p,
@@ -1324,6 +1434,31 @@ button:disabled {
   .app-shell {
     padding-right: 12px;
     padding-left: 12px;
+  }
+
+  .mascot-frame {
+    height: 112px;
+  }
+
+  .portal-entry {
+    min-height: 138px;
+    padding: 18px 112px 18px 16px;
+  }
+
+  .portal-entry strong {
+    font-size: 30px;
+  }
+
+  .portal-mascot {
+    top: 18px;
+    right: 14px;
+    width: 86px;
+    height: 96px;
+  }
+
+  .note-mascot {
+    width: 66px;
+    height: 66px;
   }
 
   .dish-card {
