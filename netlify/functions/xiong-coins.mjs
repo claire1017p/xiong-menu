@@ -39,14 +39,18 @@ function cloneDefaultLedger() {
   return JSON.parse(JSON.stringify(DEFAULT_LEDGER));
 }
 
+function normalizeBalance(value) {
+  const balance = Math.trunc(Number(value));
+  return Number.isFinite(balance) ? Math.max(0, balance) : 0;
+}
+
 export function normalizeLedger(savedLedger) {
   const ledger = cloneDefaultLedger();
 
   if (savedLedger && typeof savedLedger === "object") {
     for (const id of ACCOUNT_ORDER) {
       const savedAccount = savedLedger.accounts?.[id];
-      const savedBalance = Number(savedAccount?.balance);
-      ledger.accounts[id].balance = Number.isFinite(savedBalance) ? savedBalance : 0;
+      ledger.accounts[id].balance = normalizeBalance(savedAccount?.balance);
     }
 
     if (Array.isArray(savedLedger.transactions)) {
@@ -100,7 +104,17 @@ function makeTransaction({ action, amount, from = null, to = null, note = "" }) 
   };
 }
 
+function assertCanDebit(account, amount) {
+  if (account.balance < amount) {
+    throw new Error(`${account.name} 余额不足，不能扣成负数。当前余额 ${account.balance}，需要 ${amount}。`);
+  }
+}
+
 function applyTransaction(ledger, transaction) {
+  if (transaction.from) {
+    assertCanDebit(ledger.accounts[transaction.from], transaction.amount);
+  }
+
   if (transaction.from) {
     ledger.accounts[transaction.from].balance -= transaction.amount;
   }
@@ -122,6 +136,11 @@ export function applyOperation(ledger, payload) {
   const note = getNote(payload?.note);
 
   if (action === "add") {
+    const actor = getAccount(ledger, payload.actor, "操作账户");
+    if (actor.id !== "bank") {
+      throw new Error("只有 Bank 可以添加小熊币");
+    }
+
     const account = getAccount(ledger, payload.account, "添加账户");
     return applyTransaction(
       ledger,

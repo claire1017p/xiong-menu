@@ -292,6 +292,21 @@ function formatBalances(ledger = coinLedger) {
   return ACCOUNT_IDS.map((id) => `${getAccountName(id)} ${ledger.accounts[id]?.balance ?? 0}`).join(" / ");
 }
 
+function getMenuPaymentAccounts() {
+  if (!activeAccount || !TRANSFER_ACCOUNTS.includes(activeAccount.id)) {
+    throw new Error("请用 Nono 或 Onetwo 账户点菜，Bank 只负责管理小熊币。");
+  }
+
+  return {
+    from: activeAccount.id,
+    to: TRANSFER_ACCOUNTS.find((id) => id !== activeAccount.id)
+  };
+}
+
+function formatAccountRoute(from, to) {
+  return `${getAccountName(from)} → ${getAccountName(to)}`;
+}
+
 function renderSelectOptions(selectEl, accountIds, selectedId) {
   selectEl.innerHTML = accountIds
     .map((id) => `<option value="${id}" ${id === selectedId ? "selected" : ""}>${getAccountName(id)}</option>`)
@@ -368,6 +383,7 @@ function applyAuthenticatedState(account) {
   document.body.classList.add("is-authenticated");
   authUserEl.textContent = activeAccount.name;
   authStatusEl.hidden = false;
+  setCoinMode(getDefaultCoinMode());
   showLoginForm("");
 }
 
@@ -431,8 +447,8 @@ function normalizeLocalLedger(savedLedger) {
 
   if (savedLedger && typeof savedLedger === "object") {
     for (const id of ACCOUNT_IDS) {
-      const savedBalance = Number(savedLedger.accounts?.[id]?.balance);
-      ledger.accounts[id].balance = Number.isFinite(savedBalance) ? savedBalance : 0;
+      const savedBalance = Math.trunc(Number(savedLedger.accounts?.[id]?.balance));
+      ledger.accounts[id].balance = Number.isFinite(savedBalance) ? Math.max(0, savedBalance) : 0;
     }
 
     if (Array.isArray(savedLedger.transactions)) {
@@ -498,6 +514,12 @@ function makeLocalTransaction({ action, amount, from = null, to = null, note = "
   };
 }
 
+function assertLocalCanDebit(account, amount) {
+  if (account.balance < amount) {
+    throw new Error(`${account.name} 余额不足，不能扣成负数。当前余额 ${account.balance}，需要 ${amount}。`);
+  }
+}
+
 function applyLocalCoinOperation(payload) {
   const ledger = readLocalLedger();
   const action = payload?.action;
@@ -505,6 +527,11 @@ function applyLocalCoinOperation(payload) {
   let transaction;
 
   if (action === "add") {
+    const actor = getLocalCoinAccount(ledger, payload.actor, "操作账户");
+    if (actor.id !== "bank") {
+      throw new Error("只有 Bank 可以添加小熊币");
+    }
+
     const account = getLocalCoinAccount(ledger, payload.account, "添加账户");
     transaction = makeLocalTransaction({
       action,
@@ -547,6 +574,10 @@ function applyLocalCoinOperation(payload) {
     });
   } else {
     throw new Error("未知的小熊币操作");
+  }
+
+  if (transaction.from) {
+    assertLocalCanDebit(ledger.accounts[transaction.from], transaction.amount);
   }
 
   if (transaction.from) {
@@ -911,12 +942,38 @@ function renderCoinQuery() {
   `;
 }
 
+function canUseCoinMode(mode) {
+  return mode !== "add" || activeAccount?.id === "bank";
+}
+
+function getDefaultCoinMode() {
+  return activeAccount?.id === "bank" ? "add" : "pay";
+}
+
+function getDefaultPayFromAccount() {
+  if (activeAccount?.id && ACCOUNT_IDS.includes(activeAccount.id)) {
+    return activeAccount.id;
+  }
+
+  return "onetwo";
+}
+
+function getDefaultPayToAccount(fromAccountId) {
+  if (TRANSFER_ACCOUNTS.includes(fromAccountId)) {
+    return TRANSFER_ACCOUNTS.find((id) => id !== fromAccountId);
+  }
+
+  return "nono";
+}
+
 function setCoinMode(mode) {
-  coinMode = COIN_MODE_CONFIG[mode] ? mode : "add";
+  const requestedMode = COIN_MODE_CONFIG[mode] ? mode : getDefaultCoinMode();
+  coinMode = canUseCoinMode(requestedMode) ? requestedMode : getDefaultCoinMode();
   const config = COIN_MODE_CONFIG[coinMode];
   const isQueryMode = coinMode === "query";
 
   document.querySelectorAll("[data-coin-mode]").forEach((button) => {
+    button.hidden = !canUseCoinMode(button.dataset.coinMode);
     button.classList.toggle("is-active", button.dataset.coinMode === coinMode);
   });
 
@@ -933,10 +990,11 @@ function setCoinMode(mode) {
   coinSubmitEl.textContent = config.submitLabel;
   coinToFieldEl.hidden = !config.showTo;
 
-  renderSelectOptions(coinFromEl, config.fromAccounts, coinMode === "pay" ? "onetwo" : config.fromAccounts[0]);
+  const fromAccount = coinMode === "pay" ? getDefaultPayFromAccount() : config.fromAccounts[0];
+  renderSelectOptions(coinFromEl, config.fromAccounts, fromAccount);
 
   if (config.showTo) {
-    renderSelectOptions(coinToEl, config.toAccounts, coinMode === "pay" ? "nono" : config.toAccounts[0]);
+    renderSelectOptions(coinToEl, config.toAccounts, coinMode === "pay" ? getDefaultPayToAccount(fromAccount) : config.toAccounts[0]);
   }
 }
 
@@ -1040,10 +1098,16 @@ async function handleCoinFormSubmit(event) {
     return;
   }
 
+  if (coinMode === "add" && activeAccount?.id !== "bank") {
+    showToast("只有 Bank 可以添加小熊币。");
+    return;
+  }
+
   const payload = {
     action: coinMode,
     amount,
-    note: coinNoteEl.value.trim()
+    note: coinNoteEl.value.trim(),
+    actor: activeAccount?.id || ""
   };
 
   if (coinMode === "add" || coinMode === "fine" || coinMode === "save") {
@@ -1053,6 +1117,19 @@ async function handleCoinFormSubmit(event) {
   if (coinMode === "pay") {
     payload.from = coinFromEl.value;
     payload.to = coinToEl.value;
+
+    if (payload.from === payload.to) {
+      showToast("付款和收款不能是同一个账户。");
+      return;
+    }
+  }
+
+  const debitAccountId = payload.from || (coinMode === "fine" || coinMode === "save" ? payload.account : "");
+  const availableBalance = Number(coinLedger?.accounts?.[debitAccountId]?.balance ?? 0);
+
+  if (debitAccountId && amount > availableBalance) {
+    showToast(`${getAccountName(debitAccountId)} 余额不足，不能扣成负数。`);
+    return;
   }
 
   coinSubmitEl.disabled = true;
@@ -1109,14 +1186,15 @@ function openDetail(id) {
   dialogEl.showModal();
 }
 
-function buildMenuPaymentPayload(total, items) {
+function buildMenuPaymentPayload(total, items, accounts) {
   const itemSummary = items.map(({ dish, count }) => `${dish.name} x${count}`).join("，");
 
   return {
     action: "menu-order",
     amount: total,
-    from: "onetwo",
-    to: "nono",
+    from: accounts.from,
+    to: accounts.to,
+    actor: accounts.from,
     note: `熊熊菜单：${itemSummary}`
   };
 }
@@ -1129,7 +1207,7 @@ function buildOrderMessage(paymentResult = null) {
     ? [
         "",
         "小熊币付款",
-        `- Onetwo → Nono：${paymentResult.transaction.amount} 小熊币`,
+        `- ${formatAccountRoute(paymentResult.transaction.from, paymentResult.transaction.to)}：${paymentResult.transaction.amount} 小熊币`,
         `- 交易号：${paymentResult.transaction.id}`,
         `- 余额：${formatBalances(paymentResult.ledger)}`
       ]
@@ -1152,15 +1230,17 @@ function buildOrderPayload(message = buildOrderMessage(), paymentResult = null) 
   const itemSummary = items.map(({ dish, count }) => `${dish.name} x${count}`).join("，");
   const orderedAt = new Date().toLocaleString("zh-CN", { hour12: false });
   const transaction = paymentResult?.transaction;
+  const payer = transaction?.from ? getAccountName(transaction.from) : "";
+  const payee = transaction?.to ? getAccountName(transaction.to) : "";
 
   return {
     "form-name": ORDER_FORM_NAME,
     ordered_at: orderedAt,
     items: itemSummary,
     total: String(getOrderTotal(items)),
-    payer: "Onetwo",
-    payee: "Nono",
-    payment: transaction ? `Onetwo -> Nono ${transaction.amount} 小熊币` : "",
+    payer,
+    payee,
+    payment: transaction ? `${payer} -> ${payee} ${transaction.amount} 小熊币` : "",
     transaction_id: transaction?.id || "",
     balances: formatBalances(paymentResult?.ledger),
     order: message
@@ -1196,17 +1276,28 @@ async function placeOrder() {
 
   isPlacingOrder = true;
   const total = getOrderTotal(items);
+  let paymentAccounts;
+
+  try {
+    paymentAccounts = getMenuPaymentAccounts();
+  } catch (error) {
+    showToast(error.message);
+    isPlacingOrder = false;
+    return;
+  }
+
+  const paymentRoute = formatAccountRoute(paymentAccounts.from, paymentAccounts.to);
   let message = buildOrderMessage();
 
   orderMessageEl.textContent = message;
-  orderSendStatusEl.textContent = "正在把小熊币从 Onetwo 转给 Nono...";
+  orderSendStatusEl.textContent = `正在把小熊币从 ${getAccountName(paymentAccounts.from)} 转给 ${getAccountName(paymentAccounts.to)}...`;
   orderDialogEl.showModal();
   showToast("订单小票已生成，正在处理小熊币。");
 
   let paymentResult;
 
   try {
-    paymentResult = await postCoinOperation(buildMenuPaymentPayload(total, items));
+    paymentResult = await postCoinOperation(buildMenuPaymentPayload(total, items, paymentAccounts));
   } catch (error) {
     orderSendStatusEl.textContent = `小熊币转账失败，订单没有自动发送：${error.message}`;
     showToast("小熊币转账失败，订单还没发出。");
@@ -1216,11 +1307,11 @@ async function placeOrder() {
 
   message = buildOrderMessage(paymentResult);
   orderMessageEl.textContent = message;
-  orderSendStatusEl.textContent = "小熊币已到账 Nono，正在发送订单通知...";
+  orderSendStatusEl.textContent = `小熊币已到账 ${getAccountName(paymentAccounts.to)}，正在发送订单通知...`;
 
   try {
     await submitOrder(buildOrderPayload(message, paymentResult));
-    orderSendStatusEl.textContent = `订单通知已自动发出，${total} 小熊币已从 Onetwo 转入 Nono。`;
+    orderSendStatusEl.textContent = `订单通知已自动发出，${total} 小熊币已完成 ${paymentRoute}。`;
     showToast("下单成功，小熊币已到账。");
   } catch {
     orderSendStatusEl.textContent = "小熊币已到账，但订单通知自动发送失败，请用下面按钮发给主厨。";
@@ -1362,6 +1453,11 @@ document.querySelectorAll("[data-coin-mode]").forEach((button) => {
 });
 
 coinQueryAccountEl.addEventListener("change", renderCoinQuery);
+coinFromEl.addEventListener("change", () => {
+  if (coinMode === "pay" && coinFromEl.value === coinToEl.value) {
+    coinToEl.value = getDefaultPayToAccount(coinFromEl.value);
+  }
+});
 coinRefreshEl.addEventListener("click", refreshCoinQuery);
 coinFormEl.addEventListener("submit", handleCoinFormSubmit);
 loginFormEl.addEventListener("submit", handleLoginSubmit);
