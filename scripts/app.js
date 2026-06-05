@@ -2,7 +2,7 @@ const dishes = {
   ribs: {
     name: "糖醋排骨",
     price: 55,
-    image: "assets/sweet-sour-ribs.png",
+    image: "assets/sweet-sour-ribs.jpg",
     kicker: "酸甜 / 油亮 / 下饭",
     desc: "一口甜，一口酸，认真收汁到亮晶晶。",
     detail: "酸甜口的第一道热菜，适合配米饭。主厨建议趁热吃，酱汁留一点拌饭。"
@@ -10,7 +10,7 @@ const dishes = {
   wings: {
     name: "可乐鸡翅",
     price: 45,
-    image: "assets/cola-chicken-wings.png",
+    image: "assets/cola-chicken-wings.jpg",
     kicker: "焦香 / 微甜 / 温柔",
     desc: "可乐慢慢煮进鸡翅里，适合当压轴。",
     detail: "鸡翅煎到边缘微焦，再用可乐慢慢收汁。甜度不会太高，适合今晚慢慢吃。"
@@ -18,7 +18,7 @@ const dishes = {
   yuXiangPork: {
     name: "鱼香肉丝",
     price: 35,
-    image: "assets/yu-xiang-rou-si.png",
+    image: "assets/yu-xiang-rou-si.jpg",
     kicker: "咸香 / 微辣 / 下饭",
     desc: "肉丝细细炒开，酱香和酸甜都刚好。",
     detail: "经典鱼香口，带一点酸甜和微辣。适合拌饭，也适合配一口清爽小菜。"
@@ -26,7 +26,7 @@ const dishes = {
   kungPaoChicken: {
     name: "宫保鸡丁",
     price: 35,
-    image: "assets/gong-bao-ji-ding.png",
+    image: "assets/gong-bao-ji-ding.jpg",
     kicker: "花生 / 微辣 / 焦香",
     desc: "鸡丁、花生和辣椒香气凑成一盘热闹。",
     detail: "鸡丁先炒到嫩，再裹上咸甜微辣的酱汁。花生负责香，主厨负责认真。"
@@ -34,7 +34,7 @@ const dishes = {
   vegetables: {
     name: "小炒时蔬",
     price: 15,
-    image: "assets/stir-fried-vegetables.png",
+    image: "assets/stir-fried-vegetables.jpg",
     kicker: "清爽 / 蒜香 / 解腻",
     desc: "给一桌热菜留一点清爽的绿色。",
     detail: "时蔬快炒，保留脆口和鲜味。适合夹在肉菜中间吃，清清爽爽。"
@@ -42,7 +42,7 @@ const dishes = {
   tomatoEggs: {
     name: "番茄炒蛋",
     price: 20,
-    image: "assets/tomato-scrambled-eggs.png",
+    image: "assets/tomato-scrambled-eggs.jpg",
     kicker: "酸甜 / 软嫩 / 家常",
     desc: "番茄汁裹住鸡蛋，是很温柔的家常味。",
     detail: "鸡蛋炒得软一点，番茄留一点汁。简单但很会哄人开心。"
@@ -210,7 +210,7 @@ function renderPage() {
 
       return `
         <article class="dish-card ${cardClass}" data-dish-id="${id}">
-          <img src="${dish.image}" alt="${dish.name}" loading="lazy" decoding="async" />
+          <img src="${dish.image}" alt="${dish.name}" decoding="async" />
           <div class="dish-overlay">
             <div class="dish-title-row">
               <div>
