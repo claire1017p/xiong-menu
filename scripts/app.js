@@ -137,6 +137,18 @@ const pages = [
   }
 ];
 
+const APP_IMAGE_URLS = [
+  "assets/bear-piggy-pink.jpg",
+  "assets/bear-call-panda.jpg",
+  "assets/bear-icecream-panda.jpg",
+  "assets/bear-summer-panda.jpg",
+  "assets/bear-snack-hat-brown.jpg",
+  "assets/bear-call-brown.jpg",
+  "assets/bear-summer-swim.jpg",
+  "assets/bear-bedtime-phone.jpg",
+  ...Object.values(dishes).map((dish) => dish.image)
+];
+
 const order = Object.fromEntries(Object.keys(dishes).map((id) => [id, 0]));
 
 const dishListEl = document.querySelector("[data-dish-list]");
@@ -197,8 +209,81 @@ let activeAccount = null;
 let pendingPasswordAccount = null;
 let pendingPassword = "";
 let isPlacingOrder = false;
+let warmupStarted = false;
+let authWarmupPromise = null;
+let coinWarmupPromise = null;
+let menuRendered = false;
+
+function runWhenIdle(callback, timeout = 700) {
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(callback, { timeout });
+    return;
+  }
+
+  window.setTimeout(callback, timeout);
+}
+
+function warmAuthService() {
+  if (!authWarmupPromise) {
+    authWarmupPromise = fetch(AUTH_API_URL, {
+      method: "GET",
+      headers: {
+        Accept: "application/json"
+      },
+      cache: "no-store"
+    }).catch(() => null);
+  }
+
+  return authWarmupPromise;
+}
+
+function warmCoinService() {
+  if (!coinWarmupPromise) {
+    coinWarmupPromise = fetch(COIN_API_URL, {
+      method: "GET",
+      headers: {
+        Accept: "application/json"
+      },
+      cache: "no-store"
+    }).catch(() => null);
+  }
+
+  return coinWarmupPromise;
+}
+
+function preloadImage(src) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = resolve;
+    image.onerror = resolve;
+    image.src = src;
+  });
+}
+
+async function preloadImages(urls, batchSize = 3) {
+  const uniqueUrls = [...new Set(urls)];
+
+  for (let index = 0; index < uniqueUrls.length; index += batchSize) {
+    await Promise.all(uniqueUrls.slice(index, index + batchSize).map(preloadImage));
+  }
+}
+
+function startWarmup() {
+  if (warmupStarted) {
+    return;
+  }
+
+  warmupStarted = true;
+  warmAuthService();
+  runWhenIdle(() => {
+    warmCoinService();
+    preloadImages(APP_IMAGE_URLS);
+  });
+}
 
 function renderPage() {
+  menuRendered = true;
   const page = pages[currentPage];
   pageTitleEl.textContent = page.title;
   pageKickerEl.textContent = `PAGE ${currentPage + 1} / ${pages.length}`;
@@ -239,6 +324,12 @@ function renderPage() {
     .join("");
 
   renderOrder();
+}
+
+function ensureMenuRendered() {
+  if (!menuRendered) {
+    renderPage();
+  }
 }
 
 function renderOrder() {
@@ -875,6 +966,7 @@ function initializeAuth() {
 
 async function handleLoginSubmit(event) {
   event.preventDefault();
+  startWarmup();
   loginSubmitEl.disabled = true;
   setLoginMessage("正在登录...");
 
@@ -901,6 +993,7 @@ async function handleLoginSubmit(event) {
 
 async function handlePasswordSubmit(event) {
   event.preventDefault();
+  startWarmup();
 
   if (!pendingPasswordAccount) {
     showLoginForm("请先登录账户。");
@@ -1706,6 +1799,7 @@ document.addEventListener("click", (event) => {
   }
 
   if (action === "enter-menu") {
+    ensureMenuRendered();
     setAppView("menu");
     showToast("进入点菜页面。");
     return;
@@ -1802,7 +1896,9 @@ coinRefreshEl.addEventListener("click", refreshCoinQuery);
 coinFormEl.addEventListener("submit", handleCoinFormSubmit);
 loginFormEl.addEventListener("submit", handleLoginSubmit);
 passwordFormEl.addEventListener("submit", handlePasswordSubmit);
+loginUsernameEl.addEventListener("focus", startWarmup);
+loginPasswordEl.addEventListener("focus", startWarmup);
 
-renderPage();
 setCoinMode(coinMode);
 initializeAuth();
+runWhenIdle(startWarmup, 600);

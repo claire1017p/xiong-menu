@@ -161,8 +161,8 @@ button:disabled {
 }
 
 .mascot-frame img {
-  padding: 5px;
-  object-fit: contain;
+  padding: 0;
+  object-fit: cover;
 }
 
 .mascot-frame.is-call img,
