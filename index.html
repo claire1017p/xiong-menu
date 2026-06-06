@@ -59,10 +59,13 @@
           <h1>熊付宝</h1>
           <p>选择今天要进入的页面</p>
         </div>
-        <button class="portal-logout" type="button" data-action="logout">
-          <span data-portal-user></span>
-          <small>退出</small>
-        </button>
+        <div class="portal-actions">
+          <button class="portal-password" type="button" data-action="open-password-change">修改密码</button>
+          <button class="portal-logout" type="button" data-action="logout">
+            <span data-portal-user></span>
+            <small>退出</small>
+          </button>
+        </div>
       </header>
 
       <div class="portal-entry-grid">
@@ -89,6 +92,7 @@
         </div>
         <div class="topbar-actions">
           <button class="back-pill" type="button" data-action="back-portal">主页</button>
+          <button class="password-pill" type="button" data-action="open-password-change" aria-label="修改密码">改密</button>
           <button class="auth-pill" type="button" data-action="logout" data-auth-status hidden aria-label="退出登录">
             <span data-auth-user></span>
             <small>退出</small>
@@ -168,6 +172,33 @@
           <button type="button" data-action="copy-order">复制订单</button>
         </div>
       </div>
+    </dialog>
+
+    <dialog class="password-dialog" data-password-dialog>
+      <button class="close-button" type="button" data-close-password-dialog aria-label="关闭">×</button>
+      <form class="password-dialog-body" data-change-password-form>
+        <div>
+          <p>ACCOUNT SECURITY</p>
+          <h3>修改密码</h3>
+          <span data-change-password-account></span>
+        </div>
+
+        <label>
+          <span>原密码</span>
+          <input data-current-password type="password" autocomplete="current-password" required />
+        </label>
+        <label>
+          <span>新密码</span>
+          <input data-change-new-password type="password" autocomplete="new-password" minlength="4" required placeholder="至少 4 位" />
+        </label>
+        <label>
+          <span>确认新密码</span>
+          <input data-change-confirm-password type="password" autocomplete="new-password" minlength="4" required placeholder="再输入一次" />
+        </label>
+
+        <button class="password-save-button" type="submit" data-change-password-submit>保存新密码</button>
+        <p class="password-change-message" data-change-password-message role="status" aria-live="polite"></p>
+      </form>
     </dialog>
 
     <dialog class="coin-dialog" data-coin-dialog>

@@ -180,6 +180,14 @@ const portalUserEl = document.querySelector("[data-portal-user]");
 const orderDialogEl = document.querySelector("[data-order-dialog]");
 const orderMessageEl = document.querySelector("[data-order-message]");
 const orderSendStatusEl = document.querySelector("[data-order-send-status]");
+const passwordDialogEl = document.querySelector("[data-password-dialog]");
+const changePasswordFormEl = document.querySelector("[data-change-password-form]");
+const changePasswordAccountEl = document.querySelector("[data-change-password-account]");
+const currentPasswordEl = document.querySelector("[data-current-password]");
+const changeNewPasswordEl = document.querySelector("[data-change-new-password]");
+const changeConfirmPasswordEl = document.querySelector("[data-change-confirm-password]");
+const changePasswordSubmitEl = document.querySelector("[data-change-password-submit]");
+const changePasswordMessageEl = document.querySelector("[data-change-password-message]");
 const coinDialogEl = document.querySelector("[data-coin-dialog]");
 const coinAccountsEl = document.querySelector("[data-coin-accounts]");
 const coinLedgerEl = document.querySelector("[data-coin-ledger]");
@@ -1025,6 +1033,87 @@ async function handlePasswordSubmit(event) {
   }
 }
 
+function setPasswordChangeMessage(message = "", tone = "normal") {
+  changePasswordMessageEl.textContent = message;
+  changePasswordMessageEl.dataset.tone = tone;
+}
+
+function resetPasswordChangeForm() {
+  currentPasswordEl.value = "";
+  changeNewPasswordEl.value = "";
+  changeConfirmPasswordEl.value = "";
+  setPasswordChangeMessage("");
+}
+
+function openPasswordChange() {
+  if (!activeAccount) {
+    requireLogin("请先登录账户。");
+    return;
+  }
+
+  if (dialogEl.open) {
+    dialogEl.close();
+  }
+
+  if (orderDialogEl.open) {
+    orderDialogEl.close();
+  }
+
+  if (coinDialogEl.open) {
+    coinDialogEl.close();
+  }
+
+  changePasswordAccountEl.textContent = `${activeAccount.name} 当前登录`;
+  resetPasswordChangeForm();
+  passwordDialogEl.showModal();
+  window.setTimeout(() => currentPasswordEl.focus(), 0);
+}
+
+async function handleChangePasswordSubmit(event) {
+  event.preventDefault();
+  startWarmup();
+
+  if (!activeAccount) {
+    passwordDialogEl.close();
+    requireLogin("请先登录账户。");
+    return;
+  }
+
+  if (!currentPasswordEl.value) {
+    setPasswordChangeMessage("请输入原密码。", "error");
+    return;
+  }
+
+  if (changeNewPasswordEl.value !== changeConfirmPasswordEl.value) {
+    setPasswordChangeMessage("两次输入的新密码不一致。", "error");
+    return;
+  }
+
+  changePasswordSubmitEl.disabled = true;
+  setPasswordChangeMessage("正在保存新密码...");
+
+  try {
+    const data = await requestAuth({
+      action: "set-password",
+      username: activeAccount.id,
+      password: currentPasswordEl.value,
+      newPassword: changeNewPasswordEl.value
+    });
+
+    activeAccount = getPublicAccount(data.account.id);
+    saveAuthSession(activeAccount);
+    authUserEl.textContent = activeAccount.name;
+    portalUserEl.textContent = activeAccount.name;
+    resetPasswordChangeForm();
+    passwordDialogEl.close();
+    showToast("密码修改成功。");
+  } catch (error) {
+    setPasswordChangeMessage(error.message, "error");
+  } finally {
+    changePasswordSubmitEl.disabled = false;
+  }
+}
+
 function logout() {
   if (dialogEl.open) {
     dialogEl.close();
@@ -1032,6 +1121,10 @@ function logout() {
 
   if (orderDialogEl.open) {
     orderDialogEl.close();
+  }
+
+  if (passwordDialogEl.open) {
+    passwordDialogEl.close();
   }
 
   if (coinDialogEl.open) {
@@ -1798,6 +1891,11 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (action === "open-password-change") {
+    openPasswordChange();
+    return;
+  }
+
   if (action === "enter-menu") {
     ensureMenuRendered();
     setAppView("menu");
@@ -1870,6 +1968,16 @@ orderDialogEl.addEventListener("click", (event) => {
   }
 });
 
+document.querySelector("[data-close-password-dialog]").addEventListener("click", () => {
+  passwordDialogEl.close();
+});
+
+passwordDialogEl.addEventListener("click", (event) => {
+  if (event.target === passwordDialogEl) {
+    passwordDialogEl.close();
+  }
+});
+
 document.querySelector("[data-close-coin-dialog]").addEventListener("click", () => {
   coinDialogEl.close();
 });
@@ -1896,6 +2004,7 @@ coinRefreshEl.addEventListener("click", refreshCoinQuery);
 coinFormEl.addEventListener("submit", handleCoinFormSubmit);
 loginFormEl.addEventListener("submit", handleLoginSubmit);
 passwordFormEl.addEventListener("submit", handlePasswordSubmit);
+changePasswordFormEl.addEventListener("submit", handleChangePasswordSubmit);
 loginUsernameEl.addEventListener("focus", startWarmup);
 loginPasswordEl.addEventListener("focus", startWarmup);
 
