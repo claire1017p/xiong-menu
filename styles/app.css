@@ -137,7 +137,8 @@ button:disabled {
 
 .mascot-frame {
   display: block;
-  height: 118px;
+  aspect-ratio: 1 / 1;
+  height: auto;
   overflow: hidden;
   border-radius: 8px;
   border: 0;
@@ -154,26 +155,27 @@ button:disabled {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center 12%;
+  object-fit: contain;
+  object-position: center;
   filter: saturate(1.05) contrast(1.02);
   mix-blend-mode: multiply;
+  padding: 6px;
 }
 
 .mascot-frame img {
-  padding: 0;
-  object-fit: cover;
+  padding: 4px;
+  object-fit: contain;
 }
 
 .mascot-frame.is-call img,
 .portal-mascot.is-call {
-  object-position: center center;
+  object-position: center;
 }
 
 .mascot-frame.is-piggy img,
 .portal-mascot.is-piggy,
 .coin-heading-mascot.is-piggy {
-  object-position: center 48%;
+  object-position: center;
 }
 
 .login-form {
@@ -262,9 +264,9 @@ button:disabled {
 
 .portal-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 14px;
+  gap: 12px;
   padding: max(10px, env(safe-area-inset-top)) 0 22px;
 }
 
@@ -295,9 +297,11 @@ button:disabled {
 }
 
 .portal-actions {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  justify-items: end;
+  justify-content: flex-start;
+  min-width: 0;
 }
 
 .portal-logout,
@@ -313,7 +317,7 @@ button:disabled {
 }
 
 .portal-password {
-  padding: 0 12px;
+  padding: 0 14px;
   color: var(--rouge);
   font-size: 13px;
 }
@@ -361,7 +365,7 @@ button:disabled {
   position: absolute;
   top: 18px;
   right: 16px;
-  width: 104px;
+  width: 112px;
   height: 112px;
   border: 0;
   border-radius: 8px;
@@ -409,10 +413,10 @@ button:disabled {
 
 .topbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
   justify-content: space-between;
-  gap: 18px;
+  gap: 10px;
   padding: max(10px, env(safe-area-inset-top)) 0 12px;
 }
 
@@ -423,8 +427,10 @@ button:disabled {
 .topbar-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 8px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -1573,12 +1579,12 @@ button:disabled {
   }
 
   .mascot-frame {
-    height: 112px;
+    height: auto;
   }
 
   .portal-entry {
     min-height: 138px;
-    padding: 18px 112px 18px 16px;
+    padding: 18px 120px 18px 16px;
   }
 
   .portal-entry strong {
@@ -1588,7 +1594,7 @@ button:disabled {
   .portal-mascot {
     top: 18px;
     right: 14px;
-    width: 86px;
+    width: 96px;
     height: 96px;
   }
 
@@ -1609,6 +1615,18 @@ button:disabled {
 @media (min-width: 700px) {
   body {
     padding: 28px 0;
+  }
+
+  .portal-header,
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .portal-actions,
+  .topbar-actions {
+    justify-content: flex-end;
+    width: auto;
   }
 
   .app-shell {
