@@ -114,7 +114,7 @@ function normalizeCommission(savedCommission) {
   const requesterId = savedCommission.requesterId;
   const assigneeId = savedCommission.assigneeId || null;
   const bounty = normalizeBalance(savedCommission.bounty);
-  const status = ["open", "accepted", "completed"].includes(savedCommission.status) ? savedCommission.status : "open";
+  const status = ["open", "accepted", "completed", "cancelled"].includes(savedCommission.status) ? savedCommission.status : "open";
 
   if (!ACCOUNT_ORDER.includes(requesterId) || (assigneeId && !ACCOUNT_ORDER.includes(assigneeId)) || bounty <= 0) {
     return null;
@@ -133,6 +133,7 @@ function normalizeCommission(savedCommission) {
     createdAt: savedCommission.createdAt || new Date().toISOString(),
     acceptedAt: savedCommission.acceptedAt || null,
     completedAt: savedCommission.completedAt || null,
+    cancelledAt: savedCommission.cancelledAt || null,
     paidTransactionId: savedCommission.paidTransactionId || null
   };
 }
@@ -289,6 +290,7 @@ function makeCommission({ requester, amount, title, detail }) {
     createdAt: now,
     acceptedAt: null,
     completedAt: null,
+    cancelledAt: null,
     paidTransactionId: null
   };
 }
@@ -387,6 +389,37 @@ function confirmCommission(ledger, payload) {
   return { commission, transaction };
 }
 
+function cancelCommission(ledger, payload) {
+  const actor = getAccount(ledger, payload.actor, "取消账户");
+  const commission = getCommission(ledger, payload.commissionId);
+
+  if (commission.status === "completed") {
+    throw new Error("已完成的委托不能取消");
+  }
+
+  if (commission.status === "cancelled") {
+    throw new Error("这个委托已经取消了");
+  }
+
+  const isRequester = actor.id === commission.requesterId;
+  const isAssignee = actor.id === commission.assigneeId;
+
+  if (!isRequester && !isAssignee) {
+    throw new Error("只有委托双方可以取消委托");
+  }
+
+  if (commission.status === "open" && !isRequester) {
+    throw new Error("只有委托人可以取消待接受的委托");
+  }
+
+  const cancelledAt = new Date().toISOString();
+  commission.status = "cancelled";
+  commission.cancelledAt = cancelledAt;
+  ledger.updatedAt = cancelledAt;
+
+  return { commission };
+}
+
 function makeHolding({ account, amount, product, note = "" }) {
   const start = new Date();
   const maturity = addTerm(start, product);
@@ -481,6 +514,10 @@ export function applyOperation(ledger, payload) {
 
   if (action === "confirm-commission") {
     return confirmCommission(ledger, payload);
+  }
+
+  if (action === "cancel-commission") {
+    return cancelCommission(ledger, payload);
   }
 
   if (action === "add") {

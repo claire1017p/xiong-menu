@@ -1064,6 +1064,7 @@ function applyLocalCommissionOperation(ledger, payload, amount) {
       createdAt,
       acceptedAt: null,
       completedAt: null,
+      cancelledAt: null,
       paidTransactionId: null
     };
     ledger.commissions.unshift(commission);
@@ -1138,6 +1139,33 @@ function applyLocalCommissionOperation(ledger, payload, amount) {
     return { commission, transaction };
   }
 
+  if (action === "cancel-commission") {
+    if (commission.status === "completed") {
+      throw new Error("已完成的委托不能取消");
+    }
+
+    if (commission.status === "cancelled") {
+      throw new Error("这个委托已经取消了");
+    }
+
+    const isRequester = actor.id === commission.requesterId;
+    const isAssignee = actor.id === commission.assigneeId;
+
+    if (!isRequester && !isAssignee) {
+      throw new Error("只有委托双方可以取消委托");
+    }
+
+    if (commission.status === "open" && !isRequester) {
+      throw new Error("只有委托人可以取消待接受的委托");
+    }
+
+    const cancelledAt = new Date().toISOString();
+    commission.status = "cancelled";
+    commission.cancelledAt = cancelledAt;
+    ledger.updatedAt = cancelledAt;
+    return { commission };
+  }
+
   throw new Error("未知的委托操作");
 }
 
@@ -1189,7 +1217,7 @@ function applyLocalCoinOperation(payload) {
   const amount = ["add", "fine", "pay", "save", "menu-order", "create-commission"].includes(action) ? getLocalCoinAmount(payload?.amount) : 0;
   let transaction;
 
-  if (action === "create-commission" || action === "accept-commission" || action === "confirm-commission") {
+  if (action === "create-commission" || action === "accept-commission" || action === "confirm-commission" || action === "cancel-commission") {
     const result = applyLocalCommissionOperation(ledger, payload, amount);
     writeLocalLedger(ledger);
     return { ledger, transaction: result.transaction || null, commission: result.commission || null, localFallback: true };
@@ -1639,6 +1667,10 @@ function renderCoinLedger() {
 }
 
 function getCommissionStatusText(commission) {
+  if (commission.status === "cancelled") {
+    return "已取消";
+  }
+
   if (commission.status === "completed") {
     return "已完成";
   }
@@ -1656,10 +1688,11 @@ function renderCommissionAction(commission) {
   }
 
   const commissionId = escapeHtml(commission.id);
+  const cancelButton = `<button class="is-danger" type="button" data-commission-action="cancel" data-commission-id="${commissionId}">取消委托</button>`;
 
   if (commission.status === "open") {
     if (commission.requesterId === activeAccount.id) {
-      return `<button type="button" disabled>等待接受</button>`;
+      return `<div class="commission-actions"><button type="button" disabled>等待接受</button>${cancelButton}</div>`;
     }
 
     return `<button type="button" data-commission-action="accept" data-commission-id="${commissionId}">接受委托</button>`;
@@ -1669,19 +1702,30 @@ function renderCommissionAction(commission) {
     const isRequester = commission.requesterId === activeAccount.id;
     const isAssignee = commission.assigneeId === activeAccount.id;
 
+    if (!isRequester && !isAssignee) {
+      return `<button type="button" disabled>进行中</button>`;
+    }
+
+    const actions = [];
+
     if (isRequester && !commission.requesterConfirmed) {
-      return `<button type="button" data-commission-action="confirm" data-commission-id="${commissionId}">确认完成</button>`;
+      actions.push(`<button type="button" data-commission-action="confirm" data-commission-id="${commissionId}">确认完成</button>`);
     }
 
     if (isAssignee && !commission.assigneeConfirmed) {
-      return `<button type="button" data-commission-action="confirm" data-commission-id="${commissionId}">确认完成</button>`;
+      actions.push(`<button type="button" data-commission-action="confirm" data-commission-id="${commissionId}">确认完成</button>`);
     }
 
-    if (isRequester || isAssignee) {
-      return `<button type="button" disabled>已确认，等对方</button>`;
+    if (!actions.length) {
+      actions.push(`<button type="button" disabled>已确认，等对方</button>`);
     }
 
-    return `<button type="button" disabled>进行中</button>`;
+    actions.push(cancelButton);
+    return `<div class="commission-actions">${actions.join("")}</div>`;
+  }
+
+  if (commission.status === "cancelled") {
+    return `<button type="button" disabled>已取消</button>`;
   }
 
   return `<button type="button" disabled>已结算</button>`;
@@ -1709,10 +1753,15 @@ function renderCommissionList() {
     const assignee = commission.assigneeId ? getAccountName(commission.assigneeId) : "待接受";
     const requesterDone = commission.requesterConfirmed ? "委托人已确认" : "委托人未确认";
     const assigneeDone = commission.assigneeConfirmed ? "被委托人已确认" : "被委托人未确认";
+    const confirmMeta = commission.status === "accepted" ? `<span>${requesterDone}</span><span>${assigneeDone}</span>` : "";
     const detail = commission.detail ? `<p>${escapeHtml(commission.detail)}</p>` : "";
+    const cardClass = [
+      commission.status === "completed" ? "is-completed" : "",
+      commission.status === "cancelled" ? "is-cancelled" : ""
+    ].filter(Boolean).join(" ");
 
     return `
-      <article class="commission-card ${commission.status === "completed" ? "is-completed" : ""}">
+      <article class="commission-card ${cardClass}">
         <header>
           <div>
             <h4>${escapeHtml(commission.title)}</h4>
@@ -1724,8 +1773,7 @@ function renderCommissionList() {
           <span>${getCommissionStatusText(commission)}</span>
           <span>委托人 ${requester}</span>
           <span>接受人 ${assignee}</span>
-          <span>${requesterDone}</span>
-          <span>${assigneeDone}</span>
+          ${confirmMeta}
         </div>
         ${renderCommissionAction(commission)}
       </article>
@@ -2287,7 +2335,11 @@ async function handleCommissionAction(action, commissionId, button) {
   button.disabled = true;
 
   try {
-    const payloadAction = action === "accept" ? "accept-commission" : "confirm-commission";
+    const payloadAction = action === "accept"
+      ? "accept-commission"
+      : action === "cancel"
+        ? "cancel-commission"
+        : "confirm-commission";
     const data = await postCoinOperation({
       action: payloadAction,
       actor: activeAccount.id,
@@ -2296,6 +2348,8 @@ async function handleCommissionAction(action, commissionId, button) {
 
     if (data.transaction) {
       showToast("委托已完成，赏金已结算。");
+    } else if (action === "cancel") {
+      showToast("委托已取消。");
     } else if (action === "accept") {
       showToast("委托已接受。");
     } else {
