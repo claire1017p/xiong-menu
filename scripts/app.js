@@ -444,8 +444,14 @@ function renderPage() {
 
   renderCategoryList();
   pageTitleEl.textContent = category ? `${category.emoji || ""} ${category.name}` : "今日菜单";
-  pageKickerEl.textContent = category ? `${category.name} · ${categoryDishes.length} 道菜` : "MENU";
-  pageNameEl.textContent = category ? category.name : "今日菜单";
+
+  if (pageKickerEl) {
+    pageKickerEl.textContent = category ? `${category.name} · ${categoryDishes.length} 道菜` : "MENU";
+  }
+
+  if (pageNameEl) {
+    pageNameEl.textContent = category ? category.name : "今日菜单";
+  }
 
   if (!categoryDishes.length) {
     dishListEl.innerHTML = `<p class="menu-empty">这个分类还没有菜品。</p>`;
