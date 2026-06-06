@@ -5,14 +5,15 @@ const STORE_NAME = "xiong-auth";
 const AUTH_KEY = "accounts-v1";
 const HASH_ITERATIONS = 120000;
 const HASH_LENGTH = 32;
-const ACCOUNT_ORDER = ["nono", "onetwo", "bank"];
+const ACCOUNT_ORDER = ["nono", "onetwo", "bank", "restaurant"];
 
 const DEFAULT_AUTH = {
   version: 1,
   accounts: {
     nono: { id: "nono", name: "Nono", passwordSet: false, passwordHash: null, salt: null, updatedAt: null },
     onetwo: { id: "onetwo", name: "Onetwo", passwordSet: false, passwordHash: null, salt: null, updatedAt: null },
-    bank: { id: "bank", name: "Bank", passwordSet: false, passwordHash: null, salt: null, updatedAt: null }
+    bank: { id: "bank", name: "Bank", passwordSet: false, passwordHash: null, salt: null, updatedAt: null },
+    restaurant: { id: "restaurant", name: "Restaurant", passwordSet: false, passwordHash: null, salt: null, updatedAt: null }
   },
   updatedAt: null
 };

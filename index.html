@@ -8,7 +8,7 @@
     <link rel="preload" as="image" href="assets/bear-call-panda.jpg" fetchpriority="high" />
     <link rel="preload" as="image" href="assets/bear-icecream-panda.jpg" fetchpriority="high" />
     <link rel="preload" as="image" href="assets/bear-summer-panda.jpg" fetchpriority="high" />
-    <link rel="stylesheet" href="styles/app.css?v=20260606d" />
+    <link rel="stylesheet" href="styles/app.css?v=20260606e" />
   </head>
   <body class="auth-required">
     <section class="login-screen" data-login-screen aria-label="熊付宝登录">
@@ -87,6 +87,88 @@
           <strong>委托</strong>
           <small>发布委托和赏金，接受委托，双方确认后自动结算。</small>
         </button>
+        <button class="portal-entry is-admin" type="button" data-action="enter-menu-admin">
+          <img class="portal-mascot is-snack-hat" src="assets/bear-snack-hat-brown.jpg" width="480" height="480" loading="lazy" decoding="async" alt="" aria-hidden="true" />
+          <span>RESTAURANT</span>
+          <strong>菜品管理</strong>
+          <small>添加分类，新增菜品，删除下架菜品。</small>
+        </button>
+      </div>
+    </section>
+
+    <section class="menu-admin-screen" data-menu-admin-screen aria-label="餐厅菜品管理">
+      <header class="portal-header">
+        <div>
+          <p class="eyebrow">XIONG RESTAURANT</p>
+          <h1>菜品管理</h1>
+          <p>新增的分类和菜品会同步到熊熊菜单。</p>
+        </div>
+        <div class="portal-actions">
+          <button class="portal-password" type="button" data-action="open-password-change">修改密码</button>
+          <button class="portal-logout" type="button" data-action="logout">
+            <span data-admin-user></span>
+            <small>退出</small>
+          </button>
+        </div>
+      </header>
+
+      <div class="admin-layout">
+        <section class="admin-panel">
+          <div class="coin-section-title">
+            <p>CATEGORY</p>
+            <strong>添加分类</strong>
+          </div>
+          <form class="admin-form" data-admin-category-form>
+            <label>
+              <span>分类名称</span>
+              <input data-admin-category-name type="text" maxlength="24" required placeholder="比如：店长推荐" />
+            </label>
+            <label>
+              <span>分类图标</span>
+              <input data-admin-category-emoji type="text" maxlength="12" placeholder="👍👍👍" />
+            </label>
+            <button class="admin-submit-button" type="submit">添加分类</button>
+          </form>
+        </section>
+
+        <section class="admin-panel">
+          <div class="coin-section-title">
+            <p>DISH</p>
+            <strong>增加菜品</strong>
+          </div>
+          <form class="admin-form" data-admin-dish-form>
+            <label>
+              <span>菜品分类</span>
+              <select data-admin-dish-category required></select>
+            </label>
+            <label>
+              <span>菜品名称</span>
+              <input data-admin-dish-name type="text" maxlength="40" required placeholder="比如：香酥鸡叉骨" />
+            </label>
+            <label>
+              <span>价格</span>
+              <input data-admin-dish-price type="number" inputmode="numeric" min="1" step="1" required placeholder="20" />
+            </label>
+            <label>
+              <span>菜品图片</span>
+              <input data-admin-dish-image type="file" accept="image/*" required />
+            </label>
+            <label>
+              <span>菜品简介</span>
+              <input data-admin-dish-desc type="text" maxlength="80" placeholder="约500克 / 酥脆 / 微甜" />
+            </label>
+            <button class="admin-submit-button" type="submit" data-admin-dish-submit>添加菜品</button>
+          </form>
+          <p class="admin-message" data-admin-menu-message role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="admin-panel is-wide">
+          <div class="coin-section-title">
+            <p>MENU LIST</p>
+            <strong>当前菜品</strong>
+          </div>
+          <div class="admin-dish-list" data-admin-dish-list></div>
+        </section>
       </div>
     </section>
 
@@ -118,16 +200,10 @@
         <img class="note-mascot is-summer" src="assets/bear-summer-swim.jpg" width="480" height="480" loading="lazy" decoding="async" alt="" aria-hidden="true" />
       </section>
 
-      <nav class="page-controls" aria-label="菜单翻页">
-        <button type="button" data-action="prev-page" aria-label="上一页">‹</button>
-        <div>
-          <span data-page-kicker>PAGE 1 / 3</span>
-          <strong data-page-name>招牌热菜</strong>
-        </div>
-        <button type="button" data-action="next-page" aria-label="下一页">›</button>
-      </nav>
-
-      <section class="dish-list" data-dish-list aria-label="菜品列表"></section>
+      <div class="menu-board">
+        <nav class="category-rail" data-category-list aria-label="菜品分类"></nav>
+        <section class="dish-list" data-dish-list aria-label="菜品列表"></section>
+      </div>
     </main>
 
     <aside class="order-bar" aria-label="已选菜单">
@@ -341,6 +417,6 @@
 
     <div class="toast" data-toast role="status" aria-live="polite"></div>
 
-    <script src="scripts/app.js?v=20260606d"></script>
+    <script src="scripts/app.js?v=20260606e"></script>
   </body>
 </html>

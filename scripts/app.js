@@ -1,67 +1,82 @@
-const dishes = {
-  ribs: {
-    name: "糖醋排骨",
-    price: 55,
-    image: "assets/sweet-sour-ribs.jpg",
-    kicker: "酸甜 / 油亮 / 下饭",
-    desc: "一口甜，一口酸，认真收汁到亮晶晶。",
-    detail: "酸甜口的第一道热菜，适合配米饭。主厨建议趁热吃，酱汁留一点拌饭。"
-  },
-  wings: {
-    name: "可乐鸡翅",
-    price: 45,
-    image: "assets/cola-chicken-wings.jpg",
-    kicker: "焦香 / 微甜 / 温柔",
-    desc: "可乐慢慢煮进鸡翅里，适合当压轴。",
-    detail: "鸡翅煎到边缘微焦，再用可乐慢慢收汁。甜度不会太高，适合今晚慢慢吃。"
-  },
-  yuXiangPork: {
-    name: "鱼香肉丝",
-    price: 35,
-    image: "assets/yu-xiang-rou-si.jpg",
-    kicker: "咸香 / 微辣 / 下饭",
-    desc: "肉丝细细炒开，酱香和酸甜都刚好。",
-    detail: "经典鱼香口，带一点酸甜和微辣。适合拌饭，也适合配一口清爽小菜。"
-  },
-  kungPaoChicken: {
-    name: "宫保鸡丁",
-    price: 35,
-    image: "assets/gong-bao-ji-ding.jpg",
-    kicker: "花生 / 微辣 / 焦香",
-    desc: "鸡丁、花生和辣椒香气凑成一盘热闹。",
-    detail: "鸡丁先炒到嫩，再裹上咸甜微辣的酱汁。花生负责香，主厨负责认真。"
-  },
-  vegetables: {
-    name: "小炒时蔬",
-    price: 15,
-    image: "assets/stir-fried-vegetables.jpg",
-    kicker: "清爽 / 蒜香 / 解腻",
-    desc: "给一桌热菜留一点清爽的绿色。",
-    detail: "时蔬快炒，保留脆口和鲜味。适合夹在肉菜中间吃，清清爽爽。"
-  },
-  tomatoEggs: {
-    name: "番茄炒蛋",
-    price: 20,
-    image: "assets/tomato-scrambled-eggs.jpg",
-    kicker: "酸甜 / 软嫩 / 家常",
-    desc: "番茄汁裹住鸡蛋，是很温柔的家常味。",
-    detail: "鸡蛋炒得软一点，番茄留一点汁。简单但很会哄人开心。"
-  }
-};
-
 const ORDER_FORM_NAME = "xiong-menu-order";
 const COIN_API_URL = "/.netlify/functions/xiong-coins";
 const AUTH_API_URL = "/.netlify/functions/xiong-auth";
+const MENU_API_URL = "/.netlify/functions/xiong-menu";
 const AUTH_SESSION_KEY = "xiong-active-account";
 const LOCAL_AUTH_KEY = "xiong-local-auth-v1";
 const LOCAL_LEDGER_KEY = "xiong-local-ledger-v1";
+const LOCAL_MENU_KEY = "xiong-local-menu-v1";
+const AUTH_ACCOUNT_IDS = ["nono", "onetwo", "bank", "restaurant"];
 const ACCOUNT_IDS = ["nono", "onetwo", "bank"];
 const TRANSFER_ACCOUNTS = ["nono", "onetwo"];
 const ACCOUNT_NAMES = {
   nono: "Nono",
   onetwo: "Onetwo",
-  bank: "Bank"
+  bank: "Bank",
+  restaurant: "Restaurant"
 };
+const RESTAURANT_ACCOUNT_ID = "restaurant";
+const DEFAULT_CATEGORIES = [
+  { id: "recommended", name: "店长推荐", emoji: "👍👍👍", sort: 10 },
+  { id: "classic", name: "招牌热菜", emoji: "🍚🍚🍚", sort: 20 },
+  { id: "home", name: "家常小菜", emoji: "❤️❤️❤️", sort: 30 }
+];
+const DEFAULT_DISHES = [
+  {
+    id: "ribs",
+    categoryId: "classic",
+    name: "糖醋排骨",
+    price: 55,
+    image: "assets/sweet-sour-ribs.jpg",
+    description: "酸甜、油亮、很下饭。",
+    detail: "酸甜口的第一道热菜，适合配米饭。主厨建议趁热吃，酱汁留一点拌饭。"
+  },
+  {
+    id: "wings",
+    categoryId: "recommended",
+    name: "可乐鸡翅",
+    price: 45,
+    image: "assets/cola-chicken-wings.jpg",
+    description: "焦香微甜，适合今晚慢慢吃。",
+    detail: "鸡翅煎到边缘微焦，再用可乐慢慢收汁。甜度不会太高，适合当压轴。"
+  },
+  {
+    id: "yuXiangPork",
+    categoryId: "recommended",
+    name: "鱼香肉丝",
+    price: 35,
+    image: "assets/yu-xiang-rou-si.jpg",
+    description: "咸香微辣，经典下饭。",
+    detail: "经典鱼香口，带一点酸甜和微辣。适合拌饭，也适合配一口清爽小菜。"
+  },
+  {
+    id: "kungPaoChicken",
+    categoryId: "classic",
+    name: "宫保鸡丁",
+    price: 35,
+    image: "assets/gong-bao-ji-ding.jpg",
+    description: "花生、鸡丁和辣椒香气很认真。",
+    detail: "鸡丁先炒到嫩，再裹上咸甜微辣的酱汁。花生负责香，主厨负责认真。"
+  },
+  {
+    id: "vegetables",
+    categoryId: "home",
+    name: "小炒时蔬",
+    price: 15,
+    image: "assets/stir-fried-vegetables.jpg",
+    description: "给一桌热菜留一点清爽绿色。",
+    detail: "时蔬快炒，保留脆口和鲜味。适合夹在肉菜中间吃，清清爽爽。"
+  },
+  {
+    id: "tomatoEggs",
+    categoryId: "home",
+    name: "番茄炒蛋",
+    price: 20,
+    image: "assets/tomato-scrambled-eggs.jpg",
+    description: "番茄汁裹住鸡蛋，是很温柔的家常味。",
+    detail: "鸡蛋炒得软一点，番茄留一点汁。简单但很会哄人开心。"
+  }
+];
 const DEFAULT_SAVINGS_PRODUCT_ID = "fixed-30d-3";
 const SAVINGS_PRODUCTS = [
   {
@@ -119,24 +134,6 @@ const COIN_MODE_CONFIG = {
   }
 };
 
-const pages = [
-  {
-    title: "第 1 页 · 招牌热菜",
-    name: "招牌热菜",
-    dishIds: ["ribs", "wings"]
-  },
-  {
-    title: "第 2 页 · 经典下饭",
-    name: "经典下饭",
-    dishIds: ["yuXiangPork", "kungPaoChicken"]
-  },
-  {
-    title: "第 3 页 · 家常小菜",
-    name: "家常小菜",
-    dishIds: ["vegetables", "tomatoEggs"]
-  }
-];
-
 const DECOR_IMAGE_URLS = [
   "assets/bear-piggy-pink.jpg",
   "assets/bear-call-panda.jpg",
@@ -148,9 +145,12 @@ const DECOR_IMAGE_URLS = [
   "assets/bear-bedtime-phone.jpg"
 ];
 
-const order = Object.fromEntries(Object.keys(dishes).map((id) => [id, 0]));
+let menuCategories = DEFAULT_CATEGORIES.map((category) => ({ ...category }));
+let dishes = Object.fromEntries(DEFAULT_DISHES.map((dish) => [dish.id, { ...dish }]));
+const order = {};
 
 const dishListEl = document.querySelector("[data-dish-list]");
+const categoryListEl = document.querySelector("[data-category-list]");
 const pageTitleEl = document.querySelector("[data-page-title]");
 const pageKickerEl = document.querySelector("[data-page-kicker]");
 const pageNameEl = document.querySelector("[data-page-name]");
@@ -176,6 +176,7 @@ const loginMessageEl = document.querySelector("[data-login-message]");
 const authStatusEl = document.querySelector("[data-auth-status]");
 const authUserEl = document.querySelector("[data-auth-user]");
 const portalUserEl = document.querySelector("[data-portal-user]");
+const adminUserEl = document.querySelector("[data-admin-user]");
 const orderDialogEl = document.querySelector("[data-order-dialog]");
 const orderMessageEl = document.querySelector("[data-order-message]");
 const orderSendStatusEl = document.querySelector("[data-order-send-status]");
@@ -215,8 +216,20 @@ const coinRefreshEl = document.querySelector("[data-coin-refresh]");
 const savingsPanelEl = document.querySelector("[data-savings-panel]");
 const savingsProductsEl = document.querySelector("[data-savings-products]");
 const savingsHoldingsEl = document.querySelector("[data-savings-holdings]");
+const adminCategoryFormEl = document.querySelector("[data-admin-category-form]");
+const adminCategoryNameEl = document.querySelector("[data-admin-category-name]");
+const adminCategoryEmojiEl = document.querySelector("[data-admin-category-emoji]");
+const adminDishFormEl = document.querySelector("[data-admin-dish-form]");
+const adminDishCategoryEl = document.querySelector("[data-admin-dish-category]");
+const adminDishNameEl = document.querySelector("[data-admin-dish-name]");
+const adminDishPriceEl = document.querySelector("[data-admin-dish-price]");
+const adminDishImageEl = document.querySelector("[data-admin-dish-image]");
+const adminDishDescEl = document.querySelector("[data-admin-dish-desc]");
+const adminDishSubmitEl = document.querySelector("[data-admin-dish-submit]");
+const adminMenuMessageEl = document.querySelector("[data-admin-menu-message]");
+const adminDishListEl = document.querySelector("[data-admin-dish-list]");
 
-let currentPage = 0;
+let currentCategoryId = menuCategories[0]?.id || "";
 let toastTimer;
 let coinMode = "add";
 let coinLedger = null;
@@ -228,6 +241,7 @@ let isPlacingOrder = false;
 let warmupStarted = false;
 let authWarmupPromise = null;
 let coinWarmupPromise = null;
+let menuWarmupPromise = null;
 let menuRendered = false;
 
 function runWhenIdle(callback, timeout = 700) {
@@ -267,6 +281,20 @@ function warmCoinService() {
   return coinWarmupPromise;
 }
 
+function warmMenuService() {
+  if (!menuWarmupPromise) {
+    menuWarmupPromise = fetch(MENU_API_URL, {
+      method: "GET",
+      headers: {
+        Accept: "application/json"
+      },
+      cache: "no-store"
+    }).catch(() => null);
+  }
+
+  return menuWarmupPromise;
+}
+
 function preloadImage(src) {
   return new Promise((resolve) => {
     const image = new Image();
@@ -278,6 +306,10 @@ function preloadImage(src) {
 }
 
 function getMobileDishImage(src) {
+  if (!/^assets\/.+\.jpg$/i.test(src)) {
+    return src;
+  }
+
   return src.replace(/\.jpg$/, "-mobile.jpg");
 }
 
@@ -289,9 +321,12 @@ function getDishImage(dish) {
   return shouldUseMobileDishImages() ? getMobileDishImage(dish.image) : dish.image;
 }
 
-function getDishImageUrlsForPage(pageIndex = currentPage) {
-  const page = pages[pageIndex] || pages[0];
-  return page.dishIds.map((id) => getDishImage(dishes[id]));
+function getDishesInCategory(categoryId = currentCategoryId) {
+  return Object.values(dishes).filter((dish) => dish.categoryId === categoryId);
+}
+
+function getDishImageUrlsForCategory(categoryId = currentCategoryId) {
+  return getDishesInCategory(categoryId).slice(0, 4).map(getDishImage);
 }
 
 async function preloadImages(urls, batchSize = 3) {
@@ -302,8 +337,8 @@ async function preloadImages(urls, batchSize = 3) {
   }
 }
 
-function preloadPageImages(pageIndex = currentPage) {
-  return preloadImages(getDishImageUrlsForPage(pageIndex), 2);
+function preloadCategoryImages(categoryId = currentCategoryId) {
+  return preloadImages(getDishImageUrlsForCategory(categoryId), 2);
 }
 
 function startWarmup() {
@@ -313,46 +348,134 @@ function startWarmup() {
 
   warmupStarted = true;
   warmAuthService();
+  warmMenuService();
   runWhenIdle(() => {
     preloadImages(DECOR_IMAGE_URLS, 2);
   }, 900);
 }
 
+function syncOrderWithDishes() {
+  const dishIds = Object.keys(dishes);
+
+  for (const id of dishIds) {
+    if (!(id in order)) {
+      order[id] = 0;
+    }
+  }
+
+  for (const id of Object.keys(order)) {
+    if (!dishes[id]) {
+      delete order[id];
+    }
+  }
+}
+
+function createDefaultMenu() {
+  return {
+    version: 1,
+    categories: DEFAULT_CATEGORIES.map((category) => ({ ...category })),
+    dishes: DEFAULT_DISHES.map((dish) => ({ ...dish })),
+    updatedAt: null
+  };
+}
+
+function hydrateMenu(menu) {
+  const source = menu && typeof menu === "object" ? menu : createDefaultMenu();
+  const categories = Array.isArray(source.categories) ? source.categories : DEFAULT_CATEGORIES;
+  const dishList = Array.isArray(source.dishes) ? source.dishes : DEFAULT_DISHES;
+  const hasDishList = Array.isArray(source.dishes);
+  const normalizedCategories = categories
+    .map((category, index) => ({
+      id: String(category.id || "").trim(),
+      name: String(category.name || "").trim(),
+      emoji: String(category.emoji || "🍽️").trim(),
+      sort: Number.isFinite(Number(category.sort)) ? Number(category.sort) : index * 10
+    }))
+    .filter((category) => category.id && category.name)
+    .sort((a, b) => a.sort - b.sort);
+  const categoryIds = new Set(normalizedCategories.map((category) => category.id));
+  const normalizedDishes = dishList
+    .map((dish) => ({
+      id: String(dish.id || "").trim(),
+      categoryId: String(dish.categoryId || "").trim(),
+      name: String(dish.name || "").trim(),
+      price: Math.trunc(Number(dish.price)),
+      image: String(dish.image || "").trim(),
+      description: String(dish.description || dish.desc || "").trim(),
+      detail: String(dish.detail || "").trim()
+    }))
+    .filter((dish) => dish.id && categoryIds.has(dish.categoryId) && dish.name && Number.isFinite(dish.price) && dish.price > 0 && dish.image);
+
+  menuCategories = normalizedCategories.length ? normalizedCategories : DEFAULT_CATEGORIES.map((category) => ({ ...category }));
+  dishes = Object.fromEntries((hasDishList ? normalizedDishes : DEFAULT_DISHES).map((dish) => [dish.id, dish]));
+
+  if (!menuCategories.some((category) => category.id === currentCategoryId)) {
+    currentCategoryId = menuCategories[0]?.id || "";
+  }
+
+  syncOrderWithDishes();
+}
+
+function getCurrentCategory() {
+  return menuCategories.find((category) => category.id === currentCategoryId) || menuCategories[0] || null;
+}
+
+function renderCategoryList() {
+  if (!categoryListEl) {
+    return;
+  }
+
+  categoryListEl.innerHTML = menuCategories.map((category) => {
+    const count = getDishesInCategory(category.id).length;
+    return `
+      <button class="${category.id === currentCategoryId ? "is-active" : ""}" type="button" data-category-id="${escapeHtml(category.id)}">
+        <span>${escapeHtml(category.emoji || "🍽️")}</span>
+        <strong>${escapeHtml(category.name)}</strong>
+        <small>${count} 道</small>
+      </button>
+    `;
+  }).join("");
+}
+
 function renderPage() {
   menuRendered = true;
-  const page = pages[currentPage];
-  pageTitleEl.textContent = page.title;
-  pageKickerEl.textContent = `PAGE ${currentPage + 1} / ${pages.length}`;
-  pageNameEl.textContent = page.name;
+  const category = getCurrentCategory();
+  const categoryDishes = category ? getDishesInCategory(category.id) : [];
 
-  dishListEl.innerHTML = page.dishIds
-    .map((id, index) => {
-      const dish = dishes[id];
-      const cardClass = index % 2 === 0 ? "is-featured" : "is-offset";
+  renderCategoryList();
+  pageTitleEl.textContent = category ? `${category.emoji || ""} ${category.name}` : "今日菜单";
+  pageKickerEl.textContent = category ? `${category.name} · ${categoryDishes.length} 道菜` : "MENU";
+  pageNameEl.textContent = category ? category.name : "今日菜单";
+
+  if (!categoryDishes.length) {
+    dishListEl.innerHTML = `<p class="menu-empty">这个分类还没有菜品。</p>`;
+    renderOrder();
+    return;
+  }
+
+  dishListEl.innerHTML = categoryDishes
+    .map((dish) => {
+      const count = order[dish.id] || 0;
+      const description = dish.description || dish.detail || "主厨认真准备中。";
 
       return `
-        <article class="dish-card ${cardClass}" data-dish-id="${id}">
-          <img src="${getDishImage(dish)}" alt="${dish.name}" loading="eager" fetchpriority="high" decoding="async" />
-          <div class="dish-overlay">
-            <div class="dish-title-row">
-              <div>
-                <p>${dish.kicker}</p>
-                <h2>${dish.name}</h2>
-              </div>
-              <div class="price-badge" aria-label="${dish.price} 小熊币">
-                <strong>${dish.price}</strong>
-                <span class="bear-coin" aria-hidden="true"></span>
-              </div>
+        <article class="dish-card" data-dish-id="${escapeHtml(dish.id)}">
+          <button class="dish-thumb-button" type="button" data-open-detail="${escapeHtml(dish.id)}" aria-label="查看${escapeHtml(dish.name)}">
+            <img src="${escapeHtml(getDishImage(dish))}" alt="${escapeHtml(dish.name)}" loading="lazy" decoding="async" />
+          </button>
+          <div class="dish-info">
+            <p>${escapeHtml(category.name)}</p>
+            <h2>${escapeHtml(dish.name)}</h2>
+            <span>${escapeHtml(description)}</span>
+            <div class="dish-price-row">
+              <strong>${dish.price}</strong>
+              <small>小熊币</small>
             </div>
-            <p class="dish-desc">${dish.desc}</p>
-            <div class="dish-actions">
-              <button class="detail-button" type="button" data-open-detail="${id}">看看详情</button>
-              <div class="stepper" aria-label="${dish.name}数量">
-                <button type="button" data-action="decrease" data-dish-id="${id}" aria-label="减少${dish.name}">-</button>
-                <span data-count-for="${id}">${order[id]}</span>
-                <button type="button" data-action="increase" data-dish-id="${id}" aria-label="增加${dish.name}">+</button>
-              </div>
-            </div>
+          </div>
+          <div class="stepper" aria-label="${escapeHtml(dish.name)}数量">
+            <button type="button" data-action="decrease" data-dish-id="${escapeHtml(dish.id)}" aria-label="减少${escapeHtml(dish.name)}">-</button>
+            <span data-count-for="${escapeHtml(dish.id)}">${count}</span>
+            <button type="button" data-action="increase" data-dish-id="${escapeHtml(dish.id)}" aria-label="增加${escapeHtml(dish.name)}">+</button>
           </div>
         </article>
       `;
@@ -363,7 +486,7 @@ function renderPage() {
 }
 
 function ensureMenuRendered() {
-  preloadPageImages(currentPage);
+  preloadCategoryImages(currentCategoryId);
 
   if (!menuRendered) {
     renderPage();
@@ -387,7 +510,7 @@ function renderOrder() {
 
 function getOrderItems() {
   return Object.entries(order)
-    .filter(([, count]) => count > 0)
+    .filter(([id, count]) => count > 0 && dishes[id])
     .map(([id, count]) => ({
       id,
       dish: dishes[id],
@@ -487,7 +610,7 @@ function shouldUseLocalFallback(responseOrError) {
 
 function getAccountIdByUsername(username) {
   const normalized = String(username || "").trim().toLowerCase();
-  return ACCOUNT_IDS.find((id) => id === normalized || ACCOUNT_NAMES[id].toLowerCase() === normalized) || "";
+  return AUTH_ACCOUNT_IDS.find((id) => id === normalized || ACCOUNT_NAMES[id].toLowerCase() === normalized) || "";
 }
 
 function getPublicAccount(accountId) {
@@ -521,7 +644,7 @@ function showPasswordForm(account, password) {
   passwordFormEl.hidden = false;
   newPasswordEl.value = "";
   confirmPasswordEl.value = "";
-  setLoginMessage("首次登录需要设置新密码，保存后会自动进入菜单。");
+  setLoginMessage("首次登录需要设置新密码，保存后会自动进入熊付宝。");
   window.setTimeout(() => newPasswordEl.focus(), 0);
 }
 
@@ -535,6 +658,11 @@ function saveAuthSession(account) {
 function setAppView(view = "portal") {
   document.body.classList.toggle("view-portal", view === "portal");
   document.body.classList.toggle("view-menu", view === "menu");
+  document.body.classList.toggle("view-admin", view === "admin");
+}
+
+function isRestaurantAccount(account = activeAccount) {
+  return account?.id === RESTAURANT_ACCOUNT_ID;
 }
 
 function applyAuthenticatedState(account) {
@@ -542,16 +670,26 @@ function applyAuthenticatedState(account) {
   saveAuthSession(activeAccount);
   document.body.classList.remove("auth-required");
   document.body.classList.add("is-authenticated");
+  document.body.classList.toggle("is-restaurant", isRestaurantAccount(activeAccount));
   authUserEl.textContent = activeAccount.name;
   portalUserEl.textContent = activeAccount.name;
+  adminUserEl.textContent = activeAccount.name;
   authStatusEl.hidden = false;
-  setAppView("portal");
-  setCoinMode(getDefaultCoinMode());
+  setAppView(isRestaurantAccount(activeAccount) ? "admin" : "portal");
+  if (!isRestaurantAccount(activeAccount)) {
+    setCoinMode(getDefaultCoinMode());
+  }
   showLoginForm("");
   runWhenIdle(() => {
-    warmCoinService();
+    if (!isRestaurantAccount(activeAccount)) {
+      warmCoinService();
+    }
+    warmMenuService();
     preloadImages(DECOR_IMAGE_URLS, 2);
-    preloadPageImages(0);
+    if (!isRestaurantAccount(activeAccount)) {
+      preloadCategoryImages(currentCategoryId);
+    }
+    fetchMenu().catch(() => null);
   }, 700);
 }
 
@@ -560,16 +698,18 @@ function requireLogin(message = "") {
   sessionStorage.removeItem(AUTH_SESSION_KEY);
   document.body.classList.add("auth-required");
   document.body.classList.remove("is-authenticated");
-  document.body.classList.remove("view-portal", "view-menu");
+  document.body.classList.remove("is-restaurant");
+  document.body.classList.remove("view-portal", "view-menu", "view-admin");
   authStatusEl.hidden = true;
   portalUserEl.textContent = "";
+  adminUserEl.textContent = "";
   showLoginForm(message);
   window.setTimeout(() => loginPasswordEl.focus(), 0);
 }
 
 function readLocalAuth() {
   const fallback = {
-    accounts: Object.fromEntries(ACCOUNT_IDS.map((id) => [
+    accounts: Object.fromEntries(AUTH_ACCOUNT_IDS.map((id) => [
       id,
       { id, name: getAccountName(id), passwordSet: false, password: "" }
     ]))
@@ -579,7 +719,7 @@ function readLocalAuth() {
     const saved = JSON.parse(localStorage.getItem(LOCAL_AUTH_KEY) || "null");
 
     if (saved && typeof saved === "object") {
-      for (const id of ACCOUNT_IDS) {
+      for (const id of AUTH_ACCOUNT_IDS) {
         const savedAccount = saved.accounts?.[id];
 
         if (savedAccount && typeof savedAccount === "object") {
@@ -656,6 +796,127 @@ function readLocalLedger() {
 
 function writeLocalLedger(ledger) {
   localStorage.setItem(LOCAL_LEDGER_KEY, JSON.stringify(ledger));
+}
+
+function readLocalMenu() {
+  try {
+    const menu = JSON.parse(localStorage.getItem(LOCAL_MENU_KEY) || "null");
+    return menu && typeof menu === "object" ? menu : createDefaultMenu();
+  } catch {
+    localStorage.removeItem(LOCAL_MENU_KEY);
+    return createDefaultMenu();
+  }
+}
+
+function writeLocalMenu(menu) {
+  localStorage.setItem(LOCAL_MENU_KEY, JSON.stringify(menu));
+}
+
+function makeLocalMenuId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function cleanMenuText(value, maxLength, fallback = "") {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const text = value.trim().slice(0, maxLength);
+  return text || fallback;
+}
+
+function getMenuPrice(value) {
+  const price = Math.trunc(Number(value));
+
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("价格必须大于 0");
+  }
+
+  return price;
+}
+
+function applyLocalMenuOperation(payload) {
+  if (payload?.actor !== RESTAURANT_ACCOUNT_ID) {
+    throw new Error("只有 Restaurant 可以管理菜品");
+  }
+
+  const menu = readLocalMenu();
+  hydrateMenu(menu);
+  const normalizedMenu = {
+    version: 1,
+    categories: menuCategories.map((category) => ({ ...category })),
+    dishes: Object.values(dishes).map((dish) => ({ ...dish })),
+    updatedAt: new Date().toISOString()
+  };
+
+  if (payload?.action === "add-category") {
+    const name = cleanMenuText(payload.name, 24);
+
+    if (!name) {
+      throw new Error("分类名称不能为空");
+    }
+
+    if (normalizedMenu.categories.some((category) => category.name === name)) {
+      throw new Error("这个分类已经存在");
+    }
+
+    const category = {
+      id: makeLocalMenuId("category"),
+      name,
+      emoji: cleanMenuText(payload.emoji, 12, "🍽️"),
+      sort: (normalizedMenu.categories[normalizedMenu.categories.length - 1]?.sort || 0) + 10
+    };
+    normalizedMenu.categories.push(category);
+    writeLocalMenu(normalizedMenu);
+    hydrateMenu(normalizedMenu);
+    return { menu: normalizedMenu, category, localFallback: true };
+  }
+
+  if (payload?.action === "add-dish") {
+    const category = normalizedMenu.categories.find((item) => item.id === payload.categoryId);
+
+    if (!category) {
+      throw new Error("请选择有效分类");
+    }
+
+    const dish = {
+      id: makeLocalMenuId("dish"),
+      categoryId: category.id,
+      name: cleanMenuText(payload.name, 40),
+      price: getMenuPrice(payload.price),
+      image: cleanMenuText(payload.image, 900000),
+      description: cleanMenuText(payload.description, 80),
+      detail: cleanMenuText(payload.detail, 180)
+    };
+
+    if (!dish.name) {
+      throw new Error("菜品名称不能为空");
+    }
+
+    if (!dish.image) {
+      throw new Error("请上传有效图片");
+    }
+
+    normalizedMenu.dishes.unshift(dish);
+    writeLocalMenu(normalizedMenu);
+    hydrateMenu(normalizedMenu);
+    return { menu: normalizedMenu, dish, localFallback: true };
+  }
+
+  if (payload?.action === "delete-dish") {
+    const dishIndex = normalizedMenu.dishes.findIndex((dish) => dish.id === payload.dishId);
+
+    if (dishIndex === -1) {
+      throw new Error("菜品不存在");
+    }
+
+    const [dish] = normalizedMenu.dishes.splice(dishIndex, 1);
+    writeLocalMenu(normalizedMenu);
+    hydrateMenu(normalizedMenu);
+    return { menu: normalizedMenu, dish, localFallback: true };
+  }
+
+  throw new Error("未知的菜单操作");
 }
 
 function getLocalCoinAmount(value) {
@@ -1120,12 +1381,12 @@ async function requestAuth(payload) {
 }
 
 function initializeAuth() {
-  renderSelectOptions(loginUsernameEl, ACCOUNT_IDS, "onetwo");
+  renderSelectOptions(loginUsernameEl, AUTH_ACCOUNT_IDS, "onetwo");
 
   try {
     const savedAccount = JSON.parse(sessionStorage.getItem(AUTH_SESSION_KEY) || "null");
 
-    if (savedAccount && ACCOUNT_IDS.includes(savedAccount.id)) {
+    if (savedAccount && AUTH_ACCOUNT_IDS.includes(savedAccount.id)) {
       applyAuthenticatedState(savedAccount);
       return;
     }
@@ -1464,6 +1725,141 @@ function renderCommissionList() {
       </article>
     `;
   }).join("");
+}
+
+function renderAdminCategoryOptions() {
+  if (!adminDishCategoryEl) {
+    return;
+  }
+
+  adminDishCategoryEl.innerHTML = menuCategories
+    .map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.emoji || "🍽️")} ${escapeHtml(category.name)}</option>`)
+    .join("");
+}
+
+function renderAdminDishList() {
+  if (!adminDishListEl) {
+    return;
+  }
+
+  const dishList = Object.values(dishes);
+
+  renderAdminCategoryOptions();
+
+  if (!dishList.length) {
+    adminDishListEl.innerHTML = `<p class="coin-empty">还没有菜品，先添加一道。</p>`;
+    return;
+  }
+
+  adminDishListEl.innerHTML = dishList.map((dish) => {
+    const category = menuCategories.find((item) => item.id === dish.categoryId);
+    return `
+      <article class="admin-dish-card">
+        <img src="${escapeHtml(getDishImage(dish))}" alt="${escapeHtml(dish.name)}" loading="lazy" decoding="async" />
+        <div>
+          <span>${escapeHtml(category?.name || "未分类")}</span>
+          <strong>${escapeHtml(dish.name)}</strong>
+          <small>${dish.price} 小熊币</small>
+        </div>
+        <button type="button" data-admin-delete-dish="${escapeHtml(dish.id)}">删除</button>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderMenuViews() {
+  if (menuRendered) {
+    renderPage();
+  } else {
+    renderCategoryList();
+  }
+
+  renderAdminDishList();
+}
+
+function setAdminMenuMessage(message = "", tone = "normal") {
+  adminMenuMessageEl.textContent = message;
+  adminMenuMessageEl.dataset.tone = tone;
+}
+
+async function fetchMenu({ render = true } = {}) {
+  try {
+    const response = await fetch(MENU_API_URL, {
+      headers: {
+        Accept: "application/json"
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      if (isLocalPreview() && shouldUseLocalFallback(response)) {
+        hydrateMenu(readLocalMenu());
+        if (render) {
+          renderMenuViews();
+        }
+        return { menu: createDefaultMenu(), localFallback: true };
+      }
+
+      throw new Error(data.error || "读取菜单失败");
+    }
+
+    hydrateMenu(data.menu);
+
+    if (render) {
+      renderMenuViews();
+    }
+
+    return data;
+  } catch (error) {
+    if (isLocalPreview() && shouldUseLocalFallback(error)) {
+      const menu = readLocalMenu();
+      hydrateMenu(menu);
+      if (render) {
+        renderMenuViews();
+      }
+      return { menu, localFallback: true };
+    }
+
+    throw error;
+  }
+}
+
+async function postMenuOperation(payload) {
+  try {
+    const response = await fetch(MENU_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      if (isLocalPreview() && shouldUseLocalFallback(response)) {
+        const localData = applyLocalMenuOperation(payload);
+        hydrateMenu(localData.menu);
+        renderMenuViews();
+        return localData;
+      }
+
+      throw new Error(data.error || "菜单操作失败");
+    }
+
+    hydrateMenu(data.menu);
+    renderMenuViews();
+    return data;
+  } catch (error) {
+    if (isLocalPreview() && shouldUseLocalFallback(error)) {
+      const localData = applyLocalMenuOperation(payload);
+      hydrateMenu(localData.menu);
+      renderMenuViews();
+      return localData;
+    }
+
+    throw error;
+  }
 }
 
 function getAccountStats(accountId) {
@@ -1906,6 +2302,135 @@ async function handleCommissionAction(action, commissionId, button) {
   }
 }
 
+function readImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("读取图片失败"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("图片格式无法识别"));
+    image.src = dataUrl;
+  });
+}
+
+async function prepareDishImage(file) {
+  if (!file) {
+    throw new Error("请上传菜品图片");
+  }
+
+  const dataUrl = await readImageFile(file);
+  const image = await loadImage(dataUrl);
+  const maxSide = 880;
+  const scale = Math.min(1, maxSide / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+  const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+  const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  canvas.width = width;
+  canvas.height = height;
+  context.drawImage(image, 0, 0, width, height);
+
+  return canvas.toDataURL("image/jpeg", 0.76);
+}
+
+async function handleAdminCategorySubmit(event) {
+  event.preventDefault();
+
+  if (!isRestaurantAccount()) {
+    showToast("只有 Restaurant 可以添加分类。");
+    return;
+  }
+
+  setAdminMenuMessage("正在添加分类...");
+
+  try {
+    const data = await postMenuOperation({
+      action: "add-category",
+      actor: activeAccount.id,
+      name: adminCategoryNameEl.value,
+      emoji: adminCategoryEmojiEl.value
+    });
+
+    currentCategoryId = data.category?.id || currentCategoryId;
+    adminCategoryNameEl.value = "";
+    adminCategoryEmojiEl.value = "";
+    renderMenuViews();
+    setAdminMenuMessage("分类已添加。");
+    showToast("分类已添加。");
+  } catch (error) {
+    setAdminMenuMessage(error.message, "error");
+  }
+}
+
+async function handleAdminDishSubmit(event) {
+  event.preventDefault();
+
+  if (!isRestaurantAccount()) {
+    showToast("只有 Restaurant 可以添加菜品。");
+    return;
+  }
+
+  adminDishSubmitEl.disabled = true;
+  setAdminMenuMessage("正在压缩图片...");
+
+  try {
+    const image = await prepareDishImage(adminDishImageEl.files?.[0]);
+    setAdminMenuMessage("正在添加菜品...");
+    const data = await postMenuOperation({
+      action: "add-dish",
+      actor: activeAccount.id,
+      categoryId: adminDishCategoryEl.value,
+      name: adminDishNameEl.value,
+      price: adminDishPriceEl.value,
+      image,
+      description: adminDishDescEl.value
+    });
+
+    currentCategoryId = data.dish?.categoryId || currentCategoryId;
+    adminDishFormEl.reset();
+    renderAdminCategoryOptions();
+    renderMenuViews();
+    setAdminMenuMessage("菜品已添加，熊熊菜单已同步。");
+    showToast("菜品已添加。");
+  } catch (error) {
+    setAdminMenuMessage(error.message, "error");
+  } finally {
+    adminDishSubmitEl.disabled = false;
+  }
+}
+
+async function handleAdminDeleteDish(dishId, button) {
+  if (!isRestaurantAccount()) {
+    showToast("只有 Restaurant 可以删除菜品。");
+    return;
+  }
+
+  button.disabled = true;
+  setAdminMenuMessage("正在删除菜品...");
+
+  try {
+    await postMenuOperation({
+      action: "delete-dish",
+      actor: activeAccount.id,
+      dishId
+    });
+    setAdminMenuMessage("菜品已删除。");
+    showToast("菜品已删除。");
+  } catch (error) {
+    setAdminMenuMessage(error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function handleCoinFormSubmit(event) {
   event.preventDefault();
 
@@ -2021,6 +2546,10 @@ async function refreshCoinQuery() {
 }
 
 function changeDishCount(id, delta) {
+  if (!dishes[id]) {
+    return;
+  }
+
   order[id] = Math.max(0, order[id] + delta);
   renderOrder();
 
@@ -2029,20 +2558,19 @@ function changeDishCount(id, delta) {
   }
 }
 
-function changePage(delta) {
-  currentPage = (currentPage + delta + pages.length) % pages.length;
-  preloadPageImages(currentPage);
-  renderPage();
-  showToast(`翻到${pages[currentPage].title}`);
-}
-
 function openDetail(id) {
   const dish = dishes[id];
+
+  if (!dish) {
+    return;
+  }
+
+  const category = menuCategories.find((item) => item.id === dish.categoryId);
   dialogImageEl.src = getDishImage(dish);
   dialogImageEl.alt = dish.name;
-  dialogKickerEl.textContent = dish.kicker;
+  dialogKickerEl.textContent = category ? category.name : "熊熊菜单";
   dialogTitleEl.textContent = dish.name;
-  dialogDescEl.textContent = dish.detail;
+  dialogDescEl.textContent = dish.detail || dish.description || "主厨认真准备中。";
   dialogEl.showModal();
 }
 
@@ -2213,14 +2741,28 @@ async function shareOrderMessage() {
   await copyOrderMessage();
 }
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   const actionButton = event.target.closest("[data-action]");
   const detailButton = event.target.closest("[data-open-detail]");
   const savingsButton = event.target.closest("[data-savings-product]");
   const commissionButton = event.target.closest("[data-commission-action]");
+  const categoryButton = event.target.closest("[data-category-id]");
+  const adminDeleteButton = event.target.closest("[data-admin-delete-dish]");
 
   if (detailButton) {
     openDetail(detailButton.dataset.openDetail);
+    return;
+  }
+
+  if (categoryButton) {
+    currentCategoryId = categoryButton.dataset.categoryId;
+    renderPage();
+    preloadCategoryImages(currentCategoryId);
+    return;
+  }
+
+  if (adminDeleteButton) {
+    handleAdminDeleteDish(adminDeleteButton.dataset.adminDeleteDish, adminDeleteButton);
     return;
   }
 
@@ -2260,15 +2802,36 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (isRestaurantAccount() && !["open-password-change", "logout", "enter-menu-admin"].includes(action)) {
+    setAppView("admin");
+    showToast("Restaurant 只负责菜品管理。");
+    return;
+  }
+
   if (action === "open-password-change") {
     openPasswordChange();
     return;
   }
 
   if (action === "enter-menu") {
+    try {
+      await fetchMenu();
+    } catch (error) {
+      showToast(error.message);
+    }
     ensureMenuRendered();
     setAppView("menu");
     showToast("进入点菜页面。");
+    return;
+  }
+
+  if (action === "enter-menu-admin") {
+    setAppView("admin");
+    try {
+      await fetchMenu();
+    } catch (error) {
+      setAdminMenuMessage(error.message, "error");
+    }
     return;
   }
 
@@ -2296,14 +2859,6 @@ document.addEventListener("click", (event) => {
 
   if (action === "decrease") {
     changeDishCount(dishId, -1);
-  }
-
-  if (action === "prev-page") {
-    changePage(-1);
-  }
-
-  if (action === "next-page") {
-    changePage(1);
   }
 
   if (action === "order") {
@@ -2388,12 +2943,16 @@ coinFromEl.addEventListener("change", () => {
 coinRefreshEl.addEventListener("click", refreshCoinQuery);
 coinFormEl.addEventListener("submit", handleCoinFormSubmit);
 commissionFormEl.addEventListener("submit", handleCommissionFormSubmit);
+adminCategoryFormEl.addEventListener("submit", handleAdminCategorySubmit);
+adminDishFormEl.addEventListener("submit", handleAdminDishSubmit);
 loginFormEl.addEventListener("submit", handleLoginSubmit);
 passwordFormEl.addEventListener("submit", handlePasswordSubmit);
 changePasswordFormEl.addEventListener("submit", handleChangePasswordSubmit);
 loginUsernameEl.addEventListener("focus", startWarmup);
 loginPasswordEl.addEventListener("focus", startWarmup);
 
+hydrateMenu(createDefaultMenu());
+renderMenuViews();
 setCoinMode(coinMode);
 initializeAuth();
 runWhenIdle(startWarmup, 600);
