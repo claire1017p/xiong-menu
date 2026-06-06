@@ -4,6 +4,7 @@ const STORE_NAME = "xiong-coin-ledger";
 const LEDGER_KEY = "ledger-v1";
 const MAX_TRANSACTIONS = 120;
 const MAX_HOLDINGS = 160;
+const MAX_COMMISSIONS = 120;
 
 const ACCOUNT_ORDER = ["nono", "onetwo", "bank"];
 const SAVINGS_ACCOUNTS = ["nono", "onetwo"];
@@ -36,6 +37,7 @@ const DEFAULT_LEDGER = {
     bank: { id: "bank", name: "Bank", balance: 0 }
   },
   holdings: [],
+  commissions: [],
   transactions: [],
   updatedAt: null
 };
@@ -46,7 +48,8 @@ const ACTION_LABELS = {
   pay: "支付",
   save: "储蓄",
   "savings-redeem": "到期返还",
-  "menu-order": "菜单付款"
+  "menu-order": "菜单付款",
+  "commission-reward": "委托赏金"
 };
 
 const headers = {
@@ -103,6 +106,37 @@ function normalizeHolding(savedHolding) {
   };
 }
 
+function normalizeCommission(savedCommission) {
+  if (!savedCommission || typeof savedCommission !== "object") {
+    return null;
+  }
+
+  const requesterId = savedCommission.requesterId;
+  const assigneeId = savedCommission.assigneeId || null;
+  const bounty = normalizeBalance(savedCommission.bounty);
+  const status = ["open", "accepted", "completed"].includes(savedCommission.status) ? savedCommission.status : "open";
+
+  if (!ACCOUNT_ORDER.includes(requesterId) || (assigneeId && !ACCOUNT_ORDER.includes(assigneeId)) || bounty <= 0) {
+    return null;
+  }
+
+  return {
+    id: typeof savedCommission.id === "string" ? savedCommission.id : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title: typeof savedCommission.title === "string" ? savedCommission.title.slice(0, 40) : "小熊委托",
+    detail: typeof savedCommission.detail === "string" ? savedCommission.detail.slice(0, 160) : "",
+    bounty,
+    requesterId,
+    assigneeId,
+    status,
+    requesterConfirmed: Boolean(savedCommission.requesterConfirmed),
+    assigneeConfirmed: Boolean(savedCommission.assigneeConfirmed),
+    createdAt: savedCommission.createdAt || new Date().toISOString(),
+    acceptedAt: savedCommission.acceptedAt || null,
+    completedAt: savedCommission.completedAt || null,
+    paidTransactionId: savedCommission.paidTransactionId || null
+  };
+}
+
 export function normalizeLedger(savedLedger) {
   const ledger = cloneDefaultLedger();
 
@@ -121,6 +155,13 @@ export function normalizeLedger(savedLedger) {
         .map(normalizeHolding)
         .filter(Boolean)
         .slice(0, MAX_HOLDINGS);
+    }
+
+    if (Array.isArray(savedLedger.commissions)) {
+      ledger.commissions = savedLedger.commissions
+        .map(normalizeCommission)
+        .filter(Boolean)
+        .slice(0, MAX_COMMISSIONS);
     }
 
     ledger.updatedAt = savedLedger.updatedAt || null;
@@ -223,6 +264,129 @@ function applyTransaction(ledger, transaction) {
   return transaction;
 }
 
+function getText(value, maxLength, fallback = "") {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const text = value.trim().slice(0, maxLength);
+  return text || fallback;
+}
+
+function makeCommission({ requester, amount, title, detail }) {
+  const now = new Date().toISOString();
+
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title,
+    detail,
+    bounty: amount,
+    requesterId: requester.id,
+    assigneeId: null,
+    status: "open",
+    requesterConfirmed: false,
+    assigneeConfirmed: false,
+    createdAt: now,
+    acceptedAt: null,
+    completedAt: null,
+    paidTransactionId: null
+  };
+}
+
+function getCommission(ledger, commissionId) {
+  const commission = ledger.commissions.find((item) => item.id === commissionId);
+
+  if (!commission) {
+    throw new Error("委托不存在");
+  }
+
+  return commission;
+}
+
+function createCommission(ledger, payload, amount) {
+  const requester = getAccount(ledger, payload.actor, "委托人账户");
+  const title = getText(payload.title, 40, "小熊委托");
+  const detail = getText(payload.detail, 160, "");
+
+  assertCanDebit(requester, amount);
+
+  const commission = makeCommission({ requester, amount, title, detail });
+  ledger.commissions.unshift(commission);
+  ledger.commissions = ledger.commissions.slice(0, MAX_COMMISSIONS);
+  ledger.updatedAt = commission.createdAt;
+
+  return { commission };
+}
+
+function acceptCommission(ledger, payload) {
+  const actor = getAccount(ledger, payload.actor, "接受人账户");
+  const commission = getCommission(ledger, payload.commissionId);
+
+  if (commission.status !== "open") {
+    throw new Error("这个委托已经不能接受了");
+  }
+
+  if (commission.requesterId === actor.id) {
+    throw new Error("不能接受自己发布的委托");
+  }
+
+  commission.assigneeId = actor.id;
+  commission.status = "accepted";
+  commission.acceptedAt = new Date().toISOString();
+  commission.requesterConfirmed = false;
+  commission.assigneeConfirmed = false;
+  ledger.updatedAt = commission.acceptedAt;
+
+  return { commission };
+}
+
+function confirmCommission(ledger, payload) {
+  const actor = getAccount(ledger, payload.actor, "确认账户");
+  const commission = getCommission(ledger, payload.commissionId);
+
+  if (commission.status !== "accepted" || !commission.assigneeId) {
+    throw new Error("这个委托还不能确认完成");
+  }
+
+  if (actor.id !== commission.requesterId && actor.id !== commission.assigneeId) {
+    throw new Error("只有委托双方可以确认完成");
+  }
+
+  const requesterConfirmed = commission.requesterConfirmed || actor.id === commission.requesterId;
+  const assigneeConfirmed = commission.assigneeConfirmed || actor.id === commission.assigneeId;
+
+  let transaction = null;
+
+  if (requesterConfirmed && assigneeConfirmed) {
+    transaction = applyTransaction(
+      ledger,
+      makeTransaction({
+        action: "commission-reward",
+        amount: commission.bounty,
+        from: commission.requesterId,
+        to: commission.assigneeId,
+        note: `委托完成：${commission.title}`,
+        extra: {
+          commissionId: commission.id
+        }
+      })
+    );
+  }
+
+  commission.requesterConfirmed = requesterConfirmed;
+  commission.assigneeConfirmed = assigneeConfirmed;
+
+  if (transaction) {
+    commission.status = "completed";
+    commission.completedAt = transaction.createdAt;
+    commission.paidTransactionId = transaction.id;
+  } else {
+    ledger.updatedAt = new Date().toISOString();
+  }
+
+  return { commission, transaction };
+}
+
 function makeHolding({ account, amount, product, note = "" }) {
   const start = new Date();
   const maturity = addTerm(start, product);
@@ -304,8 +468,20 @@ export function settleMaturedHoldings(ledger, now = new Date()) {
 
 export function applyOperation(ledger, payload) {
   const action = payload?.action;
-  const amount = getAmount(payload?.amount);
+  const amount = ["add", "fine", "pay", "save", "menu-order", "create-commission"].includes(action) ? getAmount(payload?.amount) : 0;
   const note = getNote(payload?.note);
+
+  if (action === "create-commission") {
+    return createCommission(ledger, payload, amount);
+  }
+
+  if (action === "accept-commission") {
+    return acceptCommission(ledger, payload);
+  }
+
+  if (action === "confirm-commission") {
+    return confirmCommission(ledger, payload);
+  }
 
   if (action === "add") {
     const actor = getAccount(ledger, payload.actor, "操作账户");
@@ -436,13 +612,15 @@ export default async function handler(req) {
     const payload = await req.json();
     const ledger = await readLedger();
     const settlements = settleMaturedHoldings(ledger);
-    const transaction = applyOperation(ledger, payload);
+    const result = applyOperation(ledger, payload);
+    const transaction = result?.transaction || (result?.id ? result : null);
 
     await writeLedger(ledger);
 
     return json({
       ledger,
       transaction,
+      commission: result?.commission || null,
       products: SAVINGS_PRODUCTS,
       settlements
     });

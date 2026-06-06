@@ -406,6 +406,12 @@ button:disabled {
     rgba(255, 253, 248, 0.9);
 }
 
+.portal-entry.is-commission {
+  background:
+    linear-gradient(135deg, rgba(255, 211, 109, 0.28), transparent 54%),
+    rgba(255, 253, 248, 0.92);
+}
+
 .app-shell {
   width: min(100%, 520px);
   max-width: 100vw;
@@ -877,6 +883,7 @@ button:disabled {
 .dish-dialog,
 .order-dialog,
 .password-dialog,
+.commission-dialog,
 .coin-dialog {
   width: min(calc(100vw - 32px), 440px);
   max-height: min(78vh, 720px);
@@ -893,6 +900,7 @@ button:disabled {
 .dish-dialog::backdrop,
 .order-dialog::backdrop,
 .password-dialog::backdrop,
+.commission-dialog::backdrop,
 .coin-dialog::backdrop {
   background: rgba(20, 14, 12, 0.54);
   backdrop-filter: blur(6px);
@@ -1119,6 +1127,175 @@ button:disabled {
   width: min(calc(100vw - 24px), 520px);
   max-height: min(88vh, 760px);
   overflow: auto;
+}
+
+.commission-dialog {
+  width: min(calc(100vw - 24px), 520px);
+  max-height: min(88vh, 760px);
+  overflow: auto;
+}
+
+.commission-dialog-body {
+  display: grid;
+  gap: 16px;
+  padding: 22px 18px 18px;
+}
+
+.commission-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  align-items: center;
+  gap: 10px;
+  padding-right: 42px;
+}
+
+.commission-heading p,
+.commission-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.commission-message[data-tone="error"] {
+  color: var(--rouge);
+}
+
+.commission-heading h3 {
+  margin: 4px 0 6px;
+  color: var(--rouge);
+  font-family: var(--font-cheese);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.commission-heading span {
+  color: var(--cocoa);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.commission-form {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(244, 95, 143, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.82);
+}
+
+.commission-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.commission-form label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.commission-form input,
+.commission-form textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid rgba(36, 23, 20, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.94);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.commission-form textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.commission-submit-button,
+.commission-card button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gold), var(--cute-pink));
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.commission-submit-button:disabled,
+.commission-card button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.commission-list-section,
+.commission-list {
+  display: grid;
+  gap: 10px;
+}
+
+.commission-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(79, 154, 141, 0.16);
+  border-radius: 8px;
+  background: rgba(199, 240, 236, 0.28);
+}
+
+.commission-card.is-completed {
+  opacity: 0.72;
+}
+
+.commission-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.commission-card h4,
+.commission-card p {
+  margin: 0;
+}
+
+.commission-card h4 {
+  color: var(--cocoa);
+  font-size: 17px;
+}
+
+.commission-card p {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.commission-card strong {
+  flex: 0 0 auto;
+  color: var(--rouge);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.commission-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.commission-meta span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.78);
+  color: var(--cocoa);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .coin-dialog-body {

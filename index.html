@@ -8,7 +8,7 @@
     <link rel="preload" as="image" href="assets/bear-call-panda.jpg" fetchpriority="high" />
     <link rel="preload" as="image" href="assets/bear-icecream-panda.jpg" fetchpriority="high" />
     <link rel="preload" as="image" href="assets/bear-summer-panda.jpg" fetchpriority="high" />
-    <link rel="stylesheet" href="styles/app.css?v=20260606c" />
+    <link rel="stylesheet" href="styles/app.css?v=20260606d" />
   </head>
   <body class="auth-required">
     <section class="login-screen" data-login-screen aria-label="熊付宝登录">
@@ -80,6 +80,12 @@
           <span>COINS</span>
           <strong>小熊币管理</strong>
           <small>查看余额、流水、储蓄和理财产品。</small>
+        </button>
+        <button class="portal-entry is-commission" type="button" data-action="enter-commission">
+          <img class="portal-mascot is-commission" src="assets/bear-bedtime-phone.jpg" width="480" height="480" loading="lazy" decoding="async" alt="" aria-hidden="true" />
+          <span>TASKS</span>
+          <strong>委托</strong>
+          <small>发布委托和赏金，接受委托，双方确认后自动结算。</small>
         </button>
       </div>
     </section>
@@ -201,6 +207,45 @@
       </form>
     </dialog>
 
+    <dialog class="commission-dialog" data-commission-dialog>
+      <button class="close-button" type="button" data-close-commission-dialog aria-label="关闭">×</button>
+      <div class="commission-dialog-body">
+        <div class="commission-heading">
+          <div>
+            <p>XIONG TASKS</p>
+            <h3>委托</h3>
+            <span data-commission-user></span>
+          </div>
+          <img class="coin-heading-mascot is-piggy" src="assets/bear-piggy-pink.jpg" width="480" height="480" loading="lazy" decoding="async" alt="" aria-hidden="true" />
+        </div>
+
+        <form class="commission-form" data-commission-form>
+          <label>
+            <span>委托内容</span>
+            <input data-commission-title type="text" maxlength="40" required placeholder="比如：帮我倒水" />
+          </label>
+          <label>
+            <span>赏金</span>
+            <input data-commission-bounty type="number" inputmode="numeric" min="1" step="1" required placeholder="10" />
+          </label>
+          <label>
+            <span>补充说明</span>
+            <textarea data-commission-detail maxlength="160" placeholder="时间、标准、备注..."></textarea>
+          </label>
+          <button class="commission-submit-button" type="submit" data-commission-submit>发布委托</button>
+          <p class="commission-message" data-commission-message role="status" aria-live="polite"></p>
+        </form>
+
+        <section class="commission-list-section">
+          <div class="coin-section-title">
+            <p>TASK BOARD</p>
+            <strong>委托列表</strong>
+          </div>
+          <div class="commission-list" data-commission-list></div>
+        </section>
+      </div>
+    </dialog>
+
     <dialog class="coin-dialog" data-coin-dialog>
       <button class="close-button" type="button" data-close-coin-dialog aria-label="关闭">×</button>
       <div class="coin-dialog-body">
@@ -296,6 +341,6 @@
 
     <div class="toast" data-toast role="status" aria-live="polite"></div>
 
-    <script src="scripts/app.js?v=20260606c"></script>
+    <script src="scripts/app.js?v=20260606d"></script>
   </body>
 </html>

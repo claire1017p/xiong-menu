@@ -179,6 +179,15 @@ const portalUserEl = document.querySelector("[data-portal-user]");
 const orderDialogEl = document.querySelector("[data-order-dialog]");
 const orderMessageEl = document.querySelector("[data-order-message]");
 const orderSendStatusEl = document.querySelector("[data-order-send-status]");
+const commissionDialogEl = document.querySelector("[data-commission-dialog]");
+const commissionFormEl = document.querySelector("[data-commission-form]");
+const commissionUserEl = document.querySelector("[data-commission-user]");
+const commissionTitleEl = document.querySelector("[data-commission-title]");
+const commissionBountyEl = document.querySelector("[data-commission-bounty]");
+const commissionDetailEl = document.querySelector("[data-commission-detail]");
+const commissionSubmitEl = document.querySelector("[data-commission-submit]");
+const commissionMessageEl = document.querySelector("[data-commission-message]");
+const commissionListEl = document.querySelector("[data-commission-list]");
 const passwordDialogEl = document.querySelector("[data-password-dialog]");
 const changePasswordFormEl = document.querySelector("[data-change-password-form]");
 const changePasswordAccountEl = document.querySelector("[data-change-password-account]");
@@ -599,6 +608,7 @@ function createDefaultLocalLedger() {
       bank: { id: "bank", name: "Bank", balance: 0 }
     },
     holdings: [],
+    commissions: [],
     transactions: [],
     updatedAt: null
   };
@@ -619,6 +629,10 @@ function normalizeLocalLedger(savedLedger) {
 
     if (Array.isArray(savedLedger.holdings)) {
       ledger.holdings = savedLedger.holdings.slice(0, 160);
+    }
+
+    if (Array.isArray(savedLedger.commissions)) {
+      ledger.commissions = savedLedger.commissions.slice(0, 120);
     }
 
     ledger.updatedAt = savedLedger.updatedAt || null;
@@ -719,7 +733,8 @@ function makeLocalTransaction({ action, amount, from = null, to = null, note = "
     pay: "支付",
     save: "储蓄",
     "savings-redeem": "到期返还",
-    "menu-order": "菜单付款"
+    "menu-order": "菜单付款",
+    "commission-reward": "委托赏金"
   };
   const createdAt = new Date().toISOString();
 
@@ -740,6 +755,123 @@ function assertLocalCanDebit(account, amount) {
   if (account.balance < amount) {
     throw new Error(`${account.name} 余额不足，不能扣成负数。当前余额 ${account.balance}，需要 ${amount}。`);
   }
+}
+
+function getLocalText(value, maxLength, fallback = "") {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const text = value.trim().slice(0, maxLength);
+  return text || fallback;
+}
+
+function getLocalCommission(ledger, commissionId) {
+  const commission = ledger.commissions.find((item) => item.id === commissionId);
+
+  if (!commission) {
+    throw new Error("委托不存在");
+  }
+
+  return commission;
+}
+
+function applyLocalCommissionOperation(ledger, payload, amount) {
+  const action = payload?.action;
+  const actor = getLocalCoinAccount(ledger, payload.actor, "操作账户");
+
+  if (action === "create-commission") {
+    assertLocalCanDebit(actor, amount);
+
+    const createdAt = new Date().toISOString();
+    const commission = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: getLocalText(payload.title, 40, "小熊委托"),
+      detail: getLocalText(payload.detail, 160, ""),
+      bounty: amount,
+      requesterId: actor.id,
+      assigneeId: null,
+      status: "open",
+      requesterConfirmed: false,
+      assigneeConfirmed: false,
+      createdAt,
+      acceptedAt: null,
+      completedAt: null,
+      paidTransactionId: null
+    };
+    ledger.commissions.unshift(commission);
+    ledger.commissions = ledger.commissions.slice(0, 120);
+    ledger.updatedAt = createdAt;
+    return { commission };
+  }
+
+  const commission = getLocalCommission(ledger, payload.commissionId);
+
+  if (action === "accept-commission") {
+    if (commission.status !== "open") {
+      throw new Error("这个委托已经不能接受了");
+    }
+
+    if (commission.requesterId === actor.id) {
+      throw new Error("不能接受自己发布的委托");
+    }
+
+    commission.assigneeId = actor.id;
+    commission.status = "accepted";
+    commission.acceptedAt = new Date().toISOString();
+    commission.requesterConfirmed = false;
+    commission.assigneeConfirmed = false;
+    ledger.updatedAt = commission.acceptedAt;
+    return { commission };
+  }
+
+  if (action === "confirm-commission") {
+    if (commission.status !== "accepted" || !commission.assigneeId) {
+      throw new Error("这个委托还不能确认完成");
+    }
+
+    if (actor.id !== commission.requesterId && actor.id !== commission.assigneeId) {
+      throw new Error("只有委托双方可以确认完成");
+    }
+
+    const requesterConfirmed = commission.requesterConfirmed || actor.id === commission.requesterId;
+    const assigneeConfirmed = commission.assigneeConfirmed || actor.id === commission.assigneeId;
+    let transaction = null;
+
+    if (requesterConfirmed && assigneeConfirmed) {
+      assertLocalCanDebit(ledger.accounts[commission.requesterId], commission.bounty);
+      transaction = makeLocalTransaction({
+        action: "commission-reward",
+        amount: commission.bounty,
+        from: commission.requesterId,
+        to: commission.assigneeId,
+        note: `委托完成：${commission.title}`,
+        extra: {
+          commissionId: commission.id
+        }
+      });
+      ledger.accounts[transaction.from].balance -= transaction.amount;
+      ledger.accounts[transaction.to].balance += transaction.amount;
+      ledger.transactions.unshift(transaction);
+      ledger.transactions = ledger.transactions.slice(0, 120);
+    }
+
+    commission.requesterConfirmed = requesterConfirmed;
+    commission.assigneeConfirmed = assigneeConfirmed;
+
+    if (transaction) {
+      commission.status = "completed";
+      commission.completedAt = transaction.createdAt;
+      commission.paidTransactionId = transaction.id;
+      ledger.updatedAt = transaction.createdAt;
+    } else {
+      ledger.updatedAt = new Date().toISOString();
+    }
+
+    return { commission, transaction };
+  }
+
+  throw new Error("未知的委托操作");
 }
 
 function settleLocalMaturedHoldings(ledger) {
@@ -787,8 +919,14 @@ function settleLocalMaturedHoldings(ledger) {
 function applyLocalCoinOperation(payload) {
   const ledger = readLocalLedger();
   const action = payload?.action;
-  const amount = getLocalCoinAmount(payload?.amount);
+  const amount = ["add", "fine", "pay", "save", "menu-order", "create-commission"].includes(action) ? getLocalCoinAmount(payload?.amount) : 0;
   let transaction;
+
+  if (action === "create-commission" || action === "accept-commission" || action === "confirm-commission") {
+    const result = applyLocalCommissionOperation(ledger, payload, amount);
+    writeLocalLedger(ledger);
+    return { ledger, transaction: result.transaction || null, commission: result.commission || null, localFallback: true };
+  }
 
   if (action === "add") {
     const actor = getLocalCoinAccount(ledger, payload.actor, "操作账户");
@@ -1149,6 +1287,10 @@ function logout() {
     orderDialogEl.close();
   }
 
+  if (commissionDialogEl.open) {
+    commissionDialogEl.close();
+  }
+
   if (passwordDialogEl.open) {
     passwordDialogEl.close();
   }
@@ -1227,6 +1369,101 @@ function renderCoinLedger() {
     coinLedger.transactions.slice(0, 10),
     "还没有流水，先记一笔小熊币吧。"
   );
+}
+
+function getCommissionStatusText(commission) {
+  if (commission.status === "completed") {
+    return "已完成";
+  }
+
+  if (commission.status === "accepted") {
+    return "进行中";
+  }
+
+  return "待接受";
+}
+
+function renderCommissionAction(commission) {
+  if (!activeAccount) {
+    return "";
+  }
+
+  const commissionId = escapeHtml(commission.id);
+
+  if (commission.status === "open") {
+    if (commission.requesterId === activeAccount.id) {
+      return `<button type="button" disabled>等待接受</button>`;
+    }
+
+    return `<button type="button" data-commission-action="accept" data-commission-id="${commissionId}">接受委托</button>`;
+  }
+
+  if (commission.status === "accepted") {
+    const isRequester = commission.requesterId === activeAccount.id;
+    const isAssignee = commission.assigneeId === activeAccount.id;
+
+    if (isRequester && !commission.requesterConfirmed) {
+      return `<button type="button" data-commission-action="confirm" data-commission-id="${commissionId}">确认完成</button>`;
+    }
+
+    if (isAssignee && !commission.assigneeConfirmed) {
+      return `<button type="button" data-commission-action="confirm" data-commission-id="${commissionId}">确认完成</button>`;
+    }
+
+    if (isRequester || isAssignee) {
+      return `<button type="button" disabled>已确认，等对方</button>`;
+    }
+
+    return `<button type="button" disabled>进行中</button>`;
+  }
+
+  return `<button type="button" disabled>已结算</button>`;
+}
+
+function renderCommissionList() {
+  if (!commissionListEl) {
+    return;
+  }
+
+  if (!coinLedger) {
+    commissionListEl.innerHTML = `<p class="coin-empty">正在读取委托...</p>`;
+    return;
+  }
+
+  const commissions = coinLedger.commissions || [];
+
+  if (!commissions.length) {
+    commissionListEl.innerHTML = `<p class="coin-empty">还没有委托，可以先发布一个。</p>`;
+    return;
+  }
+
+  commissionListEl.innerHTML = commissions.slice(0, 30).map((commission) => {
+    const requester = getAccountName(commission.requesterId);
+    const assignee = commission.assigneeId ? getAccountName(commission.assigneeId) : "待接受";
+    const requesterDone = commission.requesterConfirmed ? "委托人已确认" : "委托人未确认";
+    const assigneeDone = commission.assigneeConfirmed ? "被委托人已确认" : "被委托人未确认";
+    const detail = commission.detail ? `<p>${escapeHtml(commission.detail)}</p>` : "";
+
+    return `
+      <article class="commission-card ${commission.status === "completed" ? "is-completed" : ""}">
+        <header>
+          <div>
+            <h4>${escapeHtml(commission.title)}</h4>
+            ${detail}
+          </div>
+          <strong>${commission.bounty}</strong>
+        </header>
+        <div class="commission-meta">
+          <span>${getCommissionStatusText(commission)}</span>
+          <span>委托人 ${requester}</span>
+          <span>接受人 ${assignee}</span>
+          <span>${requesterDone}</span>
+          <span>${assigneeDone}</span>
+        </div>
+        ${renderCommissionAction(commission)}
+      </article>
+    `;
+  }).join("");
 }
 
 function getAccountStats(accountId) {
@@ -1495,6 +1732,7 @@ async function fetchCoinLedger() {
         coinLedger = readLocalLedger();
         savingsProducts = SAVINGS_PRODUCTS;
         renderCoinLedger();
+        renderCommissionList();
         return { ledger: coinLedger, localFallback: true };
       }
 
@@ -1504,12 +1742,14 @@ async function fetchCoinLedger() {
     coinLedger = data.ledger;
     savingsProducts = Array.isArray(data.products) ? data.products : SAVINGS_PRODUCTS;
     renderCoinLedger();
+    renderCommissionList();
     return data;
   } catch (error) {
     if (isLocalPreview() && shouldUseLocalFallback(error)) {
       coinLedger = readLocalLedger();
       savingsProducts = SAVINGS_PRODUCTS;
       renderCoinLedger();
+      renderCommissionList();
       return { ledger: coinLedger, localFallback: true };
     }
 
@@ -1535,6 +1775,7 @@ async function postCoinOperation(payload) {
         coinLedger = localData.ledger;
         savingsProducts = SAVINGS_PRODUCTS;
         renderCoinLedger();
+        renderCommissionList();
         return localData;
       }
 
@@ -1544,6 +1785,7 @@ async function postCoinOperation(payload) {
     coinLedger = data.ledger;
     savingsProducts = Array.isArray(data.products) ? data.products : SAVINGS_PRODUCTS;
     renderCoinLedger();
+    renderCommissionList();
     return data;
   } catch (error) {
     if (isLocalPreview() && shouldUseLocalFallback(error)) {
@@ -1551,6 +1793,7 @@ async function postCoinOperation(payload) {
       coinLedger = localData.ledger;
       savingsProducts = SAVINGS_PRODUCTS;
       renderCoinLedger();
+      renderCommissionList();
       return localData;
     }
 
@@ -1567,6 +1810,99 @@ async function openWallet() {
   } catch (error) {
     coinLedgerEl.innerHTML = `<p class="coin-empty">读取失败，请稍后再试。</p>`;
     showToast(error.message);
+  }
+}
+
+async function openCommission() {
+  commissionUserEl.textContent = activeAccount ? `${activeAccount.name} 当前登录` : "";
+  commissionDialogEl.showModal();
+  renderCommissionList();
+
+  try {
+    await fetchCoinLedger();
+  } catch (error) {
+    commissionListEl.innerHTML = `<p class="coin-empty">读取委托失败，请稍后再试。</p>`;
+    showToast(error.message);
+  }
+}
+
+function setCommissionMessage(message = "", tone = "normal") {
+  commissionMessageEl.textContent = message;
+  commissionMessageEl.dataset.tone = tone;
+}
+
+async function handleCommissionFormSubmit(event) {
+  event.preventDefault();
+
+  if (!activeAccount) {
+    requireLogin("请先登录账户。");
+    return;
+  }
+
+  const amount = Math.trunc(Number(commissionBountyEl.value));
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    setCommissionMessage("赏金必须大于 0。", "error");
+    return;
+  }
+
+  const availableBalance = Number(coinLedger?.accounts?.[activeAccount.id]?.balance ?? 0);
+
+  if (coinLedger && amount > availableBalance) {
+    setCommissionMessage(`${activeAccount.name} 余额不足，不能发布这个赏金。`, "error");
+    return;
+  }
+
+  commissionSubmitEl.disabled = true;
+  setCommissionMessage("正在发布委托...");
+
+  try {
+    await postCoinOperation({
+      action: "create-commission",
+      actor: activeAccount.id,
+      amount,
+      title: commissionTitleEl.value,
+      detail: commissionDetailEl.value
+    });
+    commissionTitleEl.value = "";
+    commissionBountyEl.value = "";
+    commissionDetailEl.value = "";
+    setCommissionMessage("委托已发布。");
+    showToast("委托已发布。");
+  } catch (error) {
+    setCommissionMessage(error.message, "error");
+  } finally {
+    commissionSubmitEl.disabled = false;
+  }
+}
+
+async function handleCommissionAction(action, commissionId, button) {
+  if (!activeAccount) {
+    requireLogin("请先登录账户。");
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    const payloadAction = action === "accept" ? "accept-commission" : "confirm-commission";
+    const data = await postCoinOperation({
+      action: payloadAction,
+      actor: activeAccount.id,
+      commissionId
+    });
+
+    if (data.transaction) {
+      showToast("委托已完成，赏金已结算。");
+    } else if (action === "accept") {
+      showToast("委托已接受。");
+    } else {
+      showToast("已确认完成，等待对方确认。");
+    }
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -1881,6 +2217,7 @@ document.addEventListener("click", (event) => {
   const actionButton = event.target.closest("[data-action]");
   const detailButton = event.target.closest("[data-open-detail]");
   const savingsButton = event.target.closest("[data-savings-product]");
+  const commissionButton = event.target.closest("[data-commission-action]");
 
   if (detailButton) {
     openDetail(detailButton.dataset.openDetail);
@@ -1894,6 +2231,11 @@ document.addEventListener("click", (event) => {
     }
 
     buySavingsProduct(savingsButton.dataset.savingsProduct);
+    return;
+  }
+
+  if (commissionButton) {
+    handleCommissionAction(commissionButton.dataset.commissionAction, commissionButton.dataset.commissionId, commissionButton);
     return;
   }
 
@@ -1939,6 +2281,12 @@ document.addEventListener("click", (event) => {
   if (action === "enter-wallet") {
     setAppView("portal");
     openWallet();
+    return;
+  }
+
+  if (action === "enter-commission") {
+    setAppView("portal");
+    openCommission();
     return;
   }
 
@@ -1995,6 +2343,16 @@ orderDialogEl.addEventListener("click", (event) => {
   }
 });
 
+document.querySelector("[data-close-commission-dialog]").addEventListener("click", () => {
+  commissionDialogEl.close();
+});
+
+commissionDialogEl.addEventListener("click", (event) => {
+  if (event.target === commissionDialogEl) {
+    commissionDialogEl.close();
+  }
+});
+
 document.querySelector("[data-close-password-dialog]").addEventListener("click", () => {
   passwordDialogEl.close();
 });
@@ -2029,6 +2387,7 @@ coinFromEl.addEventListener("change", () => {
 });
 coinRefreshEl.addEventListener("click", refreshCoinQuery);
 coinFormEl.addEventListener("submit", handleCoinFormSubmit);
+commissionFormEl.addEventListener("submit", handleCommissionFormSubmit);
 loginFormEl.addEventListener("submit", handleLoginSubmit);
 passwordFormEl.addEventListener("submit", handlePasswordSubmit);
 changePasswordFormEl.addEventListener("submit", handleChangePasswordSubmit);
