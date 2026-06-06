@@ -137,7 +137,7 @@ const pages = [
   }
 ];
 
-const APP_IMAGE_URLS = [
+const DECOR_IMAGE_URLS = [
   "assets/bear-piggy-pink.jpg",
   "assets/bear-call-panda.jpg",
   "assets/bear-icecream-panda.jpg",
@@ -145,8 +145,7 @@ const APP_IMAGE_URLS = [
   "assets/bear-snack-hat-brown.jpg",
   "assets/bear-call-brown.jpg",
   "assets/bear-summer-swim.jpg",
-  "assets/bear-bedtime-phone.jpg",
-  ...Object.values(dishes).map((dish) => dish.image)
+  "assets/bear-bedtime-phone.jpg"
 ];
 
 const order = Object.fromEntries(Object.keys(dishes).map((id) => [id, 0]));
@@ -269,12 +268,33 @@ function preloadImage(src) {
   });
 }
 
+function getMobileDishImage(src) {
+  return src.replace(/\.jpg$/, "-mobile.jpg");
+}
+
+function shouldUseMobileDishImages() {
+  return window.matchMedia?.("(max-width: 700px)").matches;
+}
+
+function getDishImage(dish) {
+  return shouldUseMobileDishImages() ? getMobileDishImage(dish.image) : dish.image;
+}
+
+function getDishImageUrlsForPage(pageIndex = currentPage) {
+  const page = pages[pageIndex] || pages[0];
+  return page.dishIds.map((id) => getDishImage(dishes[id]));
+}
+
 async function preloadImages(urls, batchSize = 3) {
   const uniqueUrls = [...new Set(urls)];
 
   for (let index = 0; index < uniqueUrls.length; index += batchSize) {
     await Promise.all(uniqueUrls.slice(index, index + batchSize).map(preloadImage));
   }
+}
+
+function preloadPageImages(pageIndex = currentPage) {
+  return preloadImages(getDishImageUrlsForPage(pageIndex), 2);
 }
 
 function startWarmup() {
@@ -285,9 +305,8 @@ function startWarmup() {
   warmupStarted = true;
   warmAuthService();
   runWhenIdle(() => {
-    warmCoinService();
-    preloadImages(APP_IMAGE_URLS);
-  });
+    preloadImages(DECOR_IMAGE_URLS, 2);
+  }, 900);
 }
 
 function renderPage() {
@@ -304,7 +323,7 @@ function renderPage() {
 
       return `
         <article class="dish-card ${cardClass}" data-dish-id="${id}">
-          <img src="${dish.image}" alt="${dish.name}" decoding="async" />
+          <img src="${getDishImage(dish)}" alt="${dish.name}" loading="eager" fetchpriority="high" decoding="async" />
           <div class="dish-overlay">
             <div class="dish-title-row">
               <div>
@@ -335,6 +354,8 @@ function renderPage() {
 }
 
 function ensureMenuRendered() {
+  preloadPageImages(currentPage);
+
   if (!menuRendered) {
     renderPage();
   }
@@ -518,6 +539,11 @@ function applyAuthenticatedState(account) {
   setAppView("portal");
   setCoinMode(getDefaultCoinMode());
   showLoginForm("");
+  runWhenIdle(() => {
+    warmCoinService();
+    preloadImages(DECOR_IMAGE_URLS, 2);
+    preloadPageImages(0);
+  }, 700);
 }
 
 function requireLogin(message = "") {
@@ -1669,13 +1695,14 @@ function changeDishCount(id, delta) {
 
 function changePage(delta) {
   currentPage = (currentPage + delta + pages.length) % pages.length;
+  preloadPageImages(currentPage);
   renderPage();
   showToast(`翻到${pages[currentPage].title}`);
 }
 
 function openDetail(id) {
   const dish = dishes[id];
-  dialogImageEl.src = dish.image;
+  dialogImageEl.src = getDishImage(dish);
   dialogImageEl.alt = dish.name;
   dialogKickerEl.textContent = dish.kicker;
   dialogTitleEl.textContent = dish.name;
