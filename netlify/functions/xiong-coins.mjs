@@ -5,6 +5,7 @@ const LEDGER_KEY = "ledger-v1";
 const MAX_TRANSACTIONS = 120;
 const MAX_HOLDINGS = 160;
 const MAX_COMMISSIONS = 120;
+const MAX_MENU_ORDERS = 120;
 
 const ACCOUNT_ORDER = ["nono", "onetwo", "bank"];
 const SAVINGS_ACCOUNTS = ["nono", "onetwo"];
@@ -38,6 +39,7 @@ const DEFAULT_LEDGER = {
   },
   holdings: [],
   commissions: [],
+  menuOrders: [],
   transactions: [],
   updatedAt: null
 };
@@ -138,6 +140,62 @@ function normalizeCommission(savedCommission) {
   };
 }
 
+function normalizeMenuOrderItem(savedItem) {
+  if (!savedItem || typeof savedItem !== "object") {
+    return null;
+  }
+
+  const name = typeof savedItem.name === "string" ? savedItem.name.slice(0, 40) : "";
+  const count = Math.max(1, Math.trunc(Number(savedItem.count) || 1));
+  const price = normalizeBalance(savedItem.price);
+
+  if (!name || price <= 0) {
+    return null;
+  }
+
+  return {
+    id: typeof savedItem.id === "string" ? savedItem.id.slice(0, 80) : "",
+    name,
+    count,
+    price,
+    total: normalizeBalance(savedItem.total) || price * count
+  };
+}
+
+function normalizeMenuOrder(savedOrder) {
+  if (!savedOrder || typeof savedOrder !== "object") {
+    return null;
+  }
+
+  const requesterId = savedOrder.requesterId;
+  const assigneeId = savedOrder.assigneeId || null;
+  const amount = normalizeBalance(savedOrder.amount);
+  const status = ["open", "accepted", "completed", "cancelled"].includes(savedOrder.status) ? savedOrder.status : "open";
+
+  if (!ACCOUNT_ORDER.includes(requesterId) || (assigneeId && !ACCOUNT_ORDER.includes(assigneeId)) || amount <= 0) {
+    return null;
+  }
+
+  const items = Array.isArray(savedOrder.items)
+    ? savedOrder.items.map(normalizeMenuOrderItem).filter(Boolean).slice(0, 24)
+    : [];
+
+  return {
+    id: typeof savedOrder.id === "string" ? savedOrder.id : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    amount,
+    requesterId,
+    assigneeId,
+    status,
+    items,
+    itemsText: typeof savedOrder.itemsText === "string" ? savedOrder.itemsText.slice(0, 240) : "",
+    createdAt: savedOrder.createdAt || new Date().toISOString(),
+    acceptedAt: savedOrder.acceptedAt || null,
+    completedAt: savedOrder.completedAt || null,
+    cancelledAt: savedOrder.cancelledAt || null,
+    paidTransactionId: savedOrder.paidTransactionId || null
+  };
+}
+
 export function normalizeLedger(savedLedger) {
   const ledger = cloneDefaultLedger();
 
@@ -163,6 +221,13 @@ export function normalizeLedger(savedLedger) {
         .map(normalizeCommission)
         .filter(Boolean)
         .slice(0, MAX_COMMISSIONS);
+    }
+
+    if (Array.isArray(savedLedger.menuOrders)) {
+      ledger.menuOrders = savedLedger.menuOrders
+        .map(normalizeMenuOrder)
+        .filter(Boolean)
+        .slice(0, MAX_MENU_ORDERS);
     }
 
     ledger.updatedAt = savedLedger.updatedAt || null;
@@ -420,6 +485,113 @@ function cancelCommission(ledger, payload) {
   return { commission };
 }
 
+function getMenuOrder(ledger, orderId) {
+  const menuOrder = ledger.menuOrders.find((item) => item.id === orderId);
+
+  if (!menuOrder) {
+    throw new Error("订单不存在");
+  }
+
+  return menuOrder;
+}
+
+function getMenuOrderItems(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map(normalizeMenuOrderItem)
+    .filter(Boolean)
+    .slice(0, 24);
+}
+
+function createMenuOrder(ledger, payload, amount) {
+  const requester = getAccount(ledger, payload.actor, "下单账户");
+  const assignee = getAccount(ledger, payload.to, "接单账户");
+
+  if (requester.id === assignee.id) {
+    throw new Error("下单和接单不能是同一个账户");
+  }
+
+  assertCanDebit(requester, amount);
+
+  const createdAt = new Date().toISOString();
+  const items = getMenuOrderItems(payload.items);
+  const menuOrder = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    amount,
+    requesterId: requester.id,
+    assigneeId: assignee.id,
+    status: "open",
+    items,
+    itemsText: getText(payload.itemsText || payload.note, 240, "熊熊菜单订单"),
+    createdAt,
+    acceptedAt: null,
+    completedAt: null,
+    cancelledAt: null,
+    paidTransactionId: null
+  };
+
+  ledger.menuOrders.unshift(menuOrder);
+  ledger.menuOrders = ledger.menuOrders.slice(0, MAX_MENU_ORDERS);
+  ledger.updatedAt = createdAt;
+
+  return { menuOrder };
+}
+
+function acceptMenuOrder(ledger, payload) {
+  const actor = getAccount(ledger, payload.actor, "接单账户");
+  const menuOrder = getMenuOrder(ledger, payload.orderId);
+
+  if (menuOrder.status !== "open") {
+    throw new Error("这个订单已经不能接单了");
+  }
+
+  if (actor.id !== menuOrder.assigneeId) {
+    throw new Error("只有收单方可以接单");
+  }
+
+  menuOrder.status = "accepted";
+  menuOrder.acceptedAt = new Date().toISOString();
+  ledger.updatedAt = menuOrder.acceptedAt;
+
+  return { menuOrder };
+}
+
+function confirmMenuOrder(ledger, payload) {
+  const actor = getAccount(ledger, payload.actor, "确认账户");
+  const menuOrder = getMenuOrder(ledger, payload.orderId);
+
+  if (menuOrder.status !== "accepted") {
+    throw new Error("这个订单还不能确认完成");
+  }
+
+  if (actor.id !== menuOrder.requesterId) {
+    throw new Error("只有下单方可以确认完成订单");
+  }
+
+  const transaction = applyTransaction(
+    ledger,
+    makeTransaction({
+      action: "menu-order",
+      amount: menuOrder.amount,
+      from: menuOrder.requesterId,
+      to: menuOrder.assigneeId,
+      note: `熊熊菜单完成：${menuOrder.itemsText}`,
+      extra: {
+        menuOrderId: menuOrder.id
+      }
+    })
+  );
+
+  menuOrder.status = "completed";
+  menuOrder.completedAt = transaction.createdAt;
+  menuOrder.paidTransactionId = transaction.id;
+
+  return { menuOrder, transaction };
+}
+
 function makeHolding({ account, amount, product, note = "" }) {
   const start = new Date();
   const maturity = addTerm(start, product);
@@ -501,7 +673,7 @@ export function settleMaturedHoldings(ledger, now = new Date()) {
 
 export function applyOperation(ledger, payload) {
   const action = payload?.action;
-  const amount = ["add", "fine", "pay", "save", "menu-order", "create-commission"].includes(action) ? getAmount(payload?.amount) : 0;
+  const amount = ["add", "fine", "pay", "save", "menu-order", "create-commission", "create-menu-order"].includes(action) ? getAmount(payload?.amount) : 0;
   const note = getNote(payload?.note);
 
   if (action === "create-commission") {
@@ -518,6 +690,18 @@ export function applyOperation(ledger, payload) {
 
   if (action === "cancel-commission") {
     return cancelCommission(ledger, payload);
+  }
+
+  if (action === "create-menu-order") {
+    return createMenuOrder(ledger, payload, amount);
+  }
+
+  if (action === "accept-menu-order") {
+    return acceptMenuOrder(ledger, payload);
+  }
+
+  if (action === "confirm-menu-order") {
+    return confirmMenuOrder(ledger, payload);
   }
 
   if (action === "add") {
@@ -658,6 +842,7 @@ export default async function handler(req) {
       ledger,
       transaction,
       commission: result?.commission || null,
+      menuOrder: result?.menuOrder || null,
       products: SAVINGS_PRODUCTS,
       settlements
     });

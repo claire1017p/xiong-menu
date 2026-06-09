@@ -156,6 +156,7 @@ const pageKickerEl = document.querySelector("[data-page-kicker]");
 const pageNameEl = document.querySelector("[data-page-name]");
 const summaryEl = document.querySelector("[data-order-summary]");
 const totalEl = document.querySelector("[data-total]");
+const menuOrderListEl = document.querySelector("[data-menu-order-list]");
 const toastEl = document.querySelector("[data-toast]");
 const dialogEl = document.querySelector("[data-dialog]");
 const dialogImageEl = document.querySelector("[data-dialog-image]");
@@ -180,6 +181,7 @@ const adminUserEl = document.querySelector("[data-admin-user]");
 const orderDialogEl = document.querySelector("[data-order-dialog]");
 const orderMessageEl = document.querySelector("[data-order-message]");
 const orderSendStatusEl = document.querySelector("[data-order-send-status]");
+const orderFinishEl = document.querySelector("[data-order-finish]");
 const commissionDialogEl = document.querySelector("[data-commission-dialog]");
 const commissionFormEl = document.querySelector("[data-commission-form]");
 const commissionUserEl = document.querySelector("[data-commission-user]");
@@ -238,6 +240,7 @@ let activeAccount = null;
 let pendingPasswordAccount = null;
 let pendingPassword = "";
 let isPlacingOrder = false;
+let currentOrderDraft = null;
 let warmupStarted = false;
 let authWarmupPromise = null;
 let coinWarmupPromise = null;
@@ -755,6 +758,7 @@ function createDefaultLocalLedger() {
     },
     holdings: [],
     commissions: [],
+    menuOrders: [],
     transactions: [],
     updatedAt: null
   };
@@ -779,6 +783,10 @@ function normalizeLocalLedger(savedLedger) {
 
     if (Array.isArray(savedLedger.commissions)) {
       ledger.commissions = savedLedger.commissions.slice(0, 120);
+    }
+
+    if (Array.isArray(savedLedger.menuOrders)) {
+      ledger.menuOrders = savedLedger.menuOrders.slice(0, 120);
     }
 
     ledger.updatedAt = savedLedger.updatedAt || null;
@@ -1169,6 +1177,116 @@ function applyLocalCommissionOperation(ledger, payload, amount) {
   throw new Error("未知的委托操作");
 }
 
+function getLocalMenuOrder(ledger, orderId) {
+  const menuOrder = ledger.menuOrders.find((item) => item.id === orderId);
+
+  if (!menuOrder) {
+    throw new Error("订单不存在");
+  }
+
+  return menuOrder;
+}
+
+function getLocalMenuOrderItems(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.slice(0, 24).map((item) => ({
+    id: getLocalText(item.id, 80, ""),
+    name: getLocalText(item.name, 40, "熊熊菜单"),
+    count: Math.max(1, Math.trunc(Number(item.count) || 1)),
+    price: Math.max(1, Math.trunc(Number(item.price) || 1)),
+    total: Math.max(1, Math.trunc(Number(item.total) || 1))
+  }));
+}
+
+function applyLocalMenuOrderOperation(ledger, payload, amount) {
+  const action = payload?.action;
+  const actor = getLocalCoinAccount(ledger, payload.actor, "操作账户");
+
+  if (action === "create-menu-order") {
+    const assignee = getLocalCoinAccount(ledger, payload.to, "接单账户");
+
+    if (actor.id === assignee.id) {
+      throw new Error("下单和接单不能是同一个账户");
+    }
+
+    assertLocalCanDebit(actor, amount);
+
+    const createdAt = new Date().toISOString();
+    const menuOrder = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      amount,
+      requesterId: actor.id,
+      assigneeId: assignee.id,
+      status: "open",
+      items: getLocalMenuOrderItems(payload.items),
+      itemsText: getLocalText(payload.itemsText || payload.note, 240, "熊熊菜单订单"),
+      createdAt,
+      acceptedAt: null,
+      completedAt: null,
+      cancelledAt: null,
+      paidTransactionId: null
+    };
+
+    ledger.menuOrders.unshift(menuOrder);
+    ledger.menuOrders = ledger.menuOrders.slice(0, 120);
+    ledger.updatedAt = createdAt;
+    return { menuOrder };
+  }
+
+  const menuOrder = getLocalMenuOrder(ledger, payload.orderId);
+
+  if (action === "accept-menu-order") {
+    if (menuOrder.status !== "open") {
+      throw new Error("这个订单已经不能接单了");
+    }
+
+    if (actor.id !== menuOrder.assigneeId) {
+      throw new Error("只有收单方可以接单");
+    }
+
+    menuOrder.status = "accepted";
+    menuOrder.acceptedAt = new Date().toISOString();
+    ledger.updatedAt = menuOrder.acceptedAt;
+    return { menuOrder };
+  }
+
+  if (action === "confirm-menu-order") {
+    if (menuOrder.status !== "accepted") {
+      throw new Error("这个订单还不能确认完成");
+    }
+
+    if (actor.id !== menuOrder.requesterId) {
+      throw new Error("只有下单方可以确认完成订单");
+    }
+
+    assertLocalCanDebit(ledger.accounts[menuOrder.requesterId], menuOrder.amount);
+    const transaction = makeLocalTransaction({
+      action: "menu-order",
+      amount: menuOrder.amount,
+      from: menuOrder.requesterId,
+      to: menuOrder.assigneeId,
+      note: `熊熊菜单完成：${menuOrder.itemsText}`,
+      extra: {
+        menuOrderId: menuOrder.id
+      }
+    });
+    ledger.accounts[transaction.from].balance -= transaction.amount;
+    ledger.accounts[transaction.to].balance += transaction.amount;
+    ledger.transactions.unshift(transaction);
+    ledger.transactions = ledger.transactions.slice(0, 120);
+    menuOrder.status = "completed";
+    menuOrder.completedAt = transaction.createdAt;
+    menuOrder.paidTransactionId = transaction.id;
+    ledger.updatedAt = transaction.createdAt;
+    return { menuOrder, transaction };
+  }
+
+  throw new Error("未知的订单操作");
+}
+
 function settleLocalMaturedHoldings(ledger) {
   const now = new Date();
   let changed = false;
@@ -1214,13 +1332,19 @@ function settleLocalMaturedHoldings(ledger) {
 function applyLocalCoinOperation(payload) {
   const ledger = readLocalLedger();
   const action = payload?.action;
-  const amount = ["add", "fine", "pay", "save", "menu-order", "create-commission"].includes(action) ? getLocalCoinAmount(payload?.amount) : 0;
+  const amount = ["add", "fine", "pay", "save", "menu-order", "create-commission", "create-menu-order"].includes(action) ? getLocalCoinAmount(payload?.amount) : 0;
   let transaction;
 
   if (action === "create-commission" || action === "accept-commission" || action === "confirm-commission" || action === "cancel-commission") {
     const result = applyLocalCommissionOperation(ledger, payload, amount);
     writeLocalLedger(ledger);
     return { ledger, transaction: result.transaction || null, commission: result.commission || null, localFallback: true };
+  }
+
+  if (action === "create-menu-order" || action === "accept-menu-order" || action === "confirm-menu-order") {
+    const result = applyLocalMenuOrderOperation(ledger, payload, amount);
+    writeLocalLedger(ledger);
+    return { ledger, transaction: result.transaction || null, menuOrder: result.menuOrder || null, localFallback: true };
   }
 
   if (action === "add") {
@@ -1781,6 +1905,104 @@ function renderCommissionList() {
   }).join("");
 }
 
+function getMenuOrderStatusText(menuOrder) {
+  if (menuOrder.status === "completed") {
+    return "已完成";
+  }
+
+  if (menuOrder.status === "accepted") {
+    return "已接单";
+  }
+
+  if (menuOrder.status === "cancelled") {
+    return "已取消";
+  }
+
+  return "待接单";
+}
+
+function renderMenuOrderAction(menuOrder) {
+  if (!activeAccount) {
+    return "";
+  }
+
+  const orderId = escapeHtml(menuOrder.id);
+
+  if (menuOrder.status === "open") {
+    if (activeAccount.id === menuOrder.assigneeId) {
+      return `<button type="button" data-menu-order-action="accept" data-menu-order-id="${orderId}">接单</button>`;
+    }
+
+    if (activeAccount.id === menuOrder.requesterId) {
+      return `<button type="button" disabled>等待接单</button>`;
+    }
+
+    return `<button type="button" disabled>待接单</button>`;
+  }
+
+  if (menuOrder.status === "accepted") {
+    if (activeAccount.id === menuOrder.requesterId) {
+      return `<button type="button" data-menu-order-action="confirm" data-menu-order-id="${orderId}">确认完成并付款</button>`;
+    }
+
+    if (activeAccount.id === menuOrder.assigneeId) {
+      return `<button type="button" disabled>已接单，等确认</button>`;
+    }
+
+    return `<button type="button" disabled>制作中</button>`;
+  }
+
+  if (menuOrder.status === "completed") {
+    return `<button type="button" disabled>已付款</button>`;
+  }
+
+  return `<button type="button" disabled>已取消</button>`;
+}
+
+function renderMenuOrderBoard() {
+  if (!menuOrderListEl) {
+    return;
+  }
+
+  if (!coinLedger) {
+    menuOrderListEl.innerHTML = `<p class="coin-empty">正在读取订单...</p>`;
+    return;
+  }
+
+  const accountId = activeAccount?.id || "";
+  const orders = (coinLedger.menuOrders || [])
+    .filter((menuOrder) => !accountId || menuOrder.requesterId === accountId || menuOrder.assigneeId === accountId)
+    .slice(0, 20);
+
+  if (!orders.length) {
+    menuOrderListEl.innerHTML = `<p class="coin-empty">还没有菜单订单。</p>`;
+    return;
+  }
+
+  menuOrderListEl.innerHTML = orders.map((menuOrder) => {
+    const route = `${getAccountName(menuOrder.requesterId)} → ${getAccountName(menuOrder.assigneeId)}`;
+    const itemText = menuOrder.itemsText || (menuOrder.items || []).map((item) => `${item.name} x${item.count}`).join("，") || "熊熊菜单订单";
+    const cardClass = [
+      menuOrder.status === "completed" ? "is-completed" : "",
+      menuOrder.status === "cancelled" ? "is-cancelled" : ""
+    ].filter(Boolean).join(" ");
+
+    return `
+      <article class="menu-order-card ${cardClass}">
+        <div>
+          <span>${getMenuOrderStatusText(menuOrder)} · ${escapeHtml(route)}</span>
+          <strong>${escapeHtml(itemText)}</strong>
+          <small>${formatCoinTime(menuOrder.createdAt)}</small>
+        </div>
+        <div>
+          <strong>${menuOrder.amount}</strong>
+          ${renderMenuOrderAction(menuOrder)}
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
 function renderAdminCategoryOptions() {
   if (!adminDishCategoryEl) {
     return;
@@ -2183,6 +2405,7 @@ async function fetchCoinLedger() {
         savingsProducts = SAVINGS_PRODUCTS;
         renderCoinLedger();
         renderCommissionList();
+        renderMenuOrderBoard();
         return { ledger: coinLedger, localFallback: true };
       }
 
@@ -2193,6 +2416,7 @@ async function fetchCoinLedger() {
     savingsProducts = Array.isArray(data.products) ? data.products : SAVINGS_PRODUCTS;
     renderCoinLedger();
     renderCommissionList();
+    renderMenuOrderBoard();
     return data;
   } catch (error) {
     if (isLocalPreview() && shouldUseLocalFallback(error)) {
@@ -2200,6 +2424,7 @@ async function fetchCoinLedger() {
       savingsProducts = SAVINGS_PRODUCTS;
       renderCoinLedger();
       renderCommissionList();
+      renderMenuOrderBoard();
       return { ledger: coinLedger, localFallback: true };
     }
 
@@ -2226,6 +2451,7 @@ async function postCoinOperation(payload) {
         savingsProducts = SAVINGS_PRODUCTS;
         renderCoinLedger();
         renderCommissionList();
+        renderMenuOrderBoard();
         return localData;
       }
 
@@ -2236,6 +2462,7 @@ async function postCoinOperation(payload) {
     savingsProducts = Array.isArray(data.products) ? data.products : SAVINGS_PRODUCTS;
     renderCoinLedger();
     renderCommissionList();
+    renderMenuOrderBoard();
     return data;
   } catch (error) {
     if (isLocalPreview() && shouldUseLocalFallback(error)) {
@@ -2244,6 +2471,7 @@ async function postCoinOperation(payload) {
       savingsProducts = SAVINGS_PRODUCTS;
       renderCoinLedger();
       renderCommissionList();
+      renderMenuOrderBoard();
       return localData;
     }
 
@@ -2634,30 +2862,45 @@ function openDetail(id) {
   dialogEl.showModal();
 }
 
-function buildMenuPaymentPayload(total, items, accounts) {
+function getOrderItemSummary(items = getOrderItems()) {
+  return items.map(({ dish, count }) => `${dish.name} x${count}`).join("，");
+}
+
+function getOrderPayloadItems(items = getOrderItems()) {
+  return items.map(({ id, dish, count }) => ({
+    id,
+    name: dish.name,
+    price: dish.price,
+    count,
+    total: dish.price * count
+  }));
+}
+
+function buildMenuOrderPayload(total, items, accounts) {
   const itemSummary = items.map(({ dish, count }) => `${dish.name} x${count}`).join("，");
 
   return {
-    action: "menu-order",
+    action: "create-menu-order",
     amount: total,
-    from: accounts.from,
     to: accounts.to,
     actor: accounts.from,
+    items: getOrderPayloadItems(items),
+    itemsText: itemSummary,
     note: `熊熊菜单：${itemSummary}`
   };
 }
 
-function buildOrderMessage(paymentResult = null) {
+function buildOrderMessage(menuOrder = null) {
   const items = getOrderItems();
   const lines = items.map(({ dish, count }) => `- ${dish.name} x${count} = ${dish.price * count} 小熊币`);
   const total = getOrderTotal(items);
-  const paymentLines = paymentResult?.transaction
+  const orderLines = menuOrder
     ? [
         "",
-        "小熊币付款",
-        `- ${formatAccountRoute(paymentResult.transaction.from, paymentResult.transaction.to)}：${paymentResult.transaction.amount} 小熊币`,
-        `- 交易号：${paymentResult.transaction.id}`,
-        `- 余额：${formatBalances(paymentResult.ledger)}`
+        "订单状态",
+        `- 订单号：${menuOrder.id}`,
+        `- 状态：${getMenuOrderStatusText(menuOrder)}`,
+        `- 接单方：${getAccountName(menuOrder.assigneeId)}`
       ]
     : [];
 
@@ -2667,9 +2910,9 @@ function buildOrderMessage(paymentResult = null) {
     ...lines,
     "",
     `合计：${total} 小熊币`,
-    ...paymentLines,
+    ...orderLines,
     "",
-    "主厨请开火。"
+    "接单后开始制作，确认完成后再付款。"
   ].join("\n");
 }
 
@@ -2722,7 +2965,6 @@ async function placeOrder() {
     return;
   }
 
-  isPlacingOrder = true;
   const total = getOrderTotal(items);
   let paymentAccounts;
 
@@ -2730,40 +2972,55 @@ async function placeOrder() {
     paymentAccounts = getMenuPaymentAccounts();
   } catch (error) {
     showToast(error.message);
-    isPlacingOrder = false;
     return;
   }
 
-  const paymentRoute = formatAccountRoute(paymentAccounts.from, paymentAccounts.to);
-  let message = buildOrderMessage();
-
+  const message = buildOrderMessage();
+  currentOrderDraft = {
+    total,
+    items,
+    paymentAccounts,
+    message
+  };
   orderMessageEl.textContent = message;
-  orderSendStatusEl.textContent = `正在把小熊币从 ${getAccountName(paymentAccounts.from)} 转给 ${getAccountName(paymentAccounts.to)}...`;
+  orderSendStatusEl.textContent = `确认后会把订单发布给 ${getAccountName(paymentAccounts.to)} 接单，完成后才付款。`;
+  orderFinishEl.disabled = false;
   orderDialogEl.showModal();
-  showToast("订单小票已生成，正在处理小熊币。");
+  showToast("订单小票已生成，请确认下单。");
+}
 
-  let paymentResult;
-
-  try {
-    paymentResult = await postCoinOperation(buildMenuPaymentPayload(total, items, paymentAccounts));
-  } catch (error) {
-    orderSendStatusEl.textContent = `小熊币转账失败，订单没有自动发送：${error.message}`;
-    showToast("小熊币转账失败，订单还没发出。");
-    isPlacingOrder = false;
+async function finishOrder() {
+  if (isPlacingOrder) {
     return;
   }
 
-  message = buildOrderMessage(paymentResult);
-  orderMessageEl.textContent = message;
-  orderSendStatusEl.textContent = `小熊币已到账 ${getAccountName(paymentAccounts.to)}，正在发送订单通知...`;
+  if (!currentOrderDraft) {
+    showToast("请先选择菜品。");
+    return;
+  }
+
+  isPlacingOrder = true;
+  orderFinishEl.disabled = true;
+  orderSendStatusEl.textContent = "正在发布订单...";
 
   try {
-    await submitOrder(buildOrderPayload(message, paymentResult));
-    orderSendStatusEl.textContent = `订单通知已自动发出，${total} 小熊币已完成 ${paymentRoute}。`;
-    showToast("下单成功，小熊币已到账。");
-  } catch {
-    orderSendStatusEl.textContent = "小熊币已到账，但订单通知自动发送失败，请用下面按钮发给主厨。";
-    showToast("订单通知失败，但小熊币已到账。");
+    const data = await postCoinOperation(buildMenuOrderPayload(
+      currentOrderDraft.total,
+      currentOrderDraft.items,
+      currentOrderDraft.paymentAccounts
+    ));
+    orderMessageEl.textContent = buildOrderMessage(data.menuOrder);
+    orderSendStatusEl.textContent = `订单已发布，等待 ${getAccountName(currentOrderDraft.paymentAccounts.to)} 接单。`;
+    for (const id of Object.keys(order)) {
+      order[id] = 0;
+    }
+    renderOrder();
+    currentOrderDraft = null;
+    showToast("下单完成，等待接单。");
+  } catch (error) {
+    orderFinishEl.disabled = false;
+    orderSendStatusEl.textContent = `下单失败：${error.message}`;
+    showToast(error.message);
   } finally {
     isPlacingOrder = false;
   }
@@ -2774,31 +3031,39 @@ async function copyOrderMessage() {
 
   try {
     await navigator.clipboard.writeText(message);
-    showToast("订单已复制，粘贴到微信发给主厨。");
+    orderSendStatusEl.textContent = "菜单内容已复制。";
+    showToast("菜单已复制。");
   } catch {
+    orderSendStatusEl.textContent = "复制失败，请长按小票文字手动复制。";
     showToast("复制失败，请长按小票文字手动复制。");
   }
 }
 
-async function shareOrderMessage() {
-  const message = orderMessageEl.textContent || buildOrderMessage();
-
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: "熊熊菜单",
-        text: message
-      });
-      showToast("订单已打开分享面板。");
-      return;
-    } catch (error) {
-      if (error.name === "AbortError") {
-        return;
-      }
-    }
+async function handleMenuOrderAction(action, orderId, button) {
+  if (!activeAccount) {
+    requireLogin("请先登录账户。");
+    return;
   }
 
-  await copyOrderMessage();
+  button.disabled = true;
+
+  try {
+    const data = await postCoinOperation({
+      action: action === "accept" ? "accept-menu-order" : "confirm-menu-order",
+      actor: activeAccount.id,
+      orderId
+    });
+
+    if (data.transaction) {
+      showToast("订单已完成，小熊币已付款。");
+    } else {
+      showToast("已接单。");
+    }
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 document.addEventListener("click", async (event) => {
@@ -2806,6 +3071,7 @@ document.addEventListener("click", async (event) => {
   const detailButton = event.target.closest("[data-open-detail]");
   const savingsButton = event.target.closest("[data-savings-product]");
   const commissionButton = event.target.closest("[data-commission-action]");
+  const menuOrderButton = event.target.closest("[data-menu-order-action]");
   const categoryButton = event.target.closest("[data-category-id]");
   const adminDeleteButton = event.target.closest("[data-admin-delete-dish]");
 
@@ -2838,6 +3104,11 @@ document.addEventListener("click", async (event) => {
 
   if (commissionButton) {
     handleCommissionAction(commissionButton.dataset.commissionAction, commissionButton.dataset.commissionId, commissionButton);
+    return;
+  }
+
+  if (menuOrderButton) {
+    handleMenuOrderAction(menuOrderButton.dataset.menuOrderAction, menuOrderButton.dataset.menuOrderId, menuOrderButton);
     return;
   }
 
@@ -2875,7 +3146,7 @@ document.addEventListener("click", async (event) => {
 
   if (action === "enter-menu") {
     try {
-      await fetchMenu();
+      await Promise.all([fetchMenu(), fetchCoinLedger()]);
     } catch (error) {
       showToast(error.message);
     }
@@ -2925,6 +3196,10 @@ document.addEventListener("click", async (event) => {
     placeOrder();
   }
 
+  if (action === "finish-order") {
+    finishOrder();
+  }
+
   if (action === "open-wallet") {
     openWallet();
   }
@@ -2933,9 +3208,6 @@ document.addEventListener("click", async (event) => {
     copyOrderMessage();
   }
 
-  if (action === "share-order") {
-    shareOrderMessage();
-  }
 });
 
 document.querySelector("[data-close-dialog]").addEventListener("click", () => {
